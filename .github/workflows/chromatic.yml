@@ -1,0 +1,39 @@
+name: Chromatic
+
+on:
+  pull_request:
+    paths:
+      - 'packages/design-system/**'
+      - 'package-lock.json'
+
+jobs:
+  visual-review:
+    name: Visual regression review
+    runs-on: ubuntu-latest
+    # Chromatic can't run without a project token; skip rather than fail red on
+    # forks and on repos where the secret hasn't been set up yet.
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # Chromatic uses git history to pick a baseline
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Skip rather than fail red until CHROMATIC_PROJECT_TOKEN is configured
+      # (see CONTRIBUTING.md). secrets.* can't be read in a job-level `if`, so
+      # the token is promoted to env above and tested here.
+      - name: Publish to Chromatic
+        if: env.CHROMATIC_PROJECT_TOKEN != ''
+        run: npx chromatic --exit-zero-on-changes --working-dir packages/design-system

@@ -1,0 +1,232 @@
+#!/usr/bin/env bash
+#
+# Install CareConnect on a remote Ubuntu VM over SSH.
+#
+# Run from your Mac/laptop (not on the VM):
+#
+#   ./deploy/remote-install.sh
+#   ./deploy/remote-install.sh --mode subdomain --domain se-tools.net
+#   VM_USER=cisco VM_HOST=192.168.11.8 ./deploy/remote-install.sh
+#
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+VM_USER="${VM_USER:-cisco}"
+VM_HOST="${VM_HOST:-192.168.11.8}"
+VM_PORT="${VM_PORT:-22}"
+REMOTE_DIR="/tmp/careconnect-install"
+SSH_OPTS=(-o ConnectTimeout=10 -p "${VM_PORT}")
+
+# --build-from-source opts out of the default artifact-based redeploy (see
+# below) and forces the old behavior: rebuild from whatever is in this local
+# checkout, directly on the VM. Needed for a brand-new VM (nothing to deploy
+# an artifact onto yet) and useful for testing local, not-yet-pushed changes.
+BUILD_FROM_SOURCE=false
+ARGS=()
+for arg in "$@"; do
+  if [[ "${arg}" == "--build-from-source" ]]; then
+    BUILD_FROM_SOURCE=true
+  else
+    ARGS+=("${arg}")
+  fi
+done
+
+# Default: path mode on port 80 using the VM IP
+if [[ ${#ARGS[@]} -eq 0 ]]; then
+  INSTALL_ARGS=(--mode path --domain "${VM_HOST}")
+else
+  INSTALL_ARGS=("${ARGS[@]}")
+fi
+
+# Resolve deploy settings from CLI args + optional --config file (for local summary)
+resolve_install_config() {
+  DOMAIN="${VM_HOST}"
+  DEPLOY_MODE="path"
+  local config_path=""
+  local args=("${INSTALL_ARGS[@]}")
+  local i=0
+  while [[ $i -lt ${#args[@]} ]]; do
+    case "${args[$i]}" in
+      --domain) DOMAIN="${args[$((i + 1))]}"; i=$((i + 2)) ;;
+      --mode) DEPLOY_MODE="${args[$((i + 1))]}"; i=$((i + 2)) ;;
+      --config) config_path="${args[$((i + 1))]}"; i=$((i + 2)) ;;
+      *) i=$((i + 1)) ;;
+    esac
+  done
+  if [[ -n "${config_path}" ]]; then
+    local cfg="${config_path}"
+    [[ "${cfg}" != /* ]] && cfg="${PROJECT_ROOT}/${cfg}"
+    if [[ -f "${cfg}" ]]; then
+      # shellcheck disable=SC1090
+      source "${cfg}"
+    fi
+  fi
+  : "${DOMAIN:=${VM_HOST}}"
+  : "${DEPLOY_MODE:=path}"
+  : "${PORTAL_HOST:=portal}"
+  : "${EHR_HOST:=ehr}"
+  : "${PORTAL_PORT:=80}"
+  : "${EHR_PORT:=80}"
+}
+
+resolve_install_config
+
+log() { printf '==> %s\n' "$*"; }
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+usage() {
+  cat <<EOF
+Install CareConnect on a remote Ubuntu VM via SSH.
+
+Usage:
+  ./deploy/remote-install.sh [install options]
+
+Environment:
+  VM_USER   SSH username (default: cisco)
+  VM_HOST   VM IP or hostname (default: 192.168.11.8)
+  VM_PORT   SSH port (default: 22)
+  SSH_KEY   Path to private key (optional)
+
+If CareConnect is already installed on the target VM, this deploys the
+latest CI-built artifact (via deploy/fetch-ci-artifact.sh + deploy-artifact.sh)
+-- the same one cd-pipeline.yml ships to preprod/prod -- instead of rebuilding
+from source on the VM. Requires the GitHub CLI (gh), authenticated.
+
+  --build-from-source   Skip the artifact and rebuild from this local
+                         checkout on the VM instead (required for a VM with
+                         no prior install; also useful to test local,
+                         not-yet-pushed changes).
+
+Install options (passed to install.sh; only used for a fresh install, or
+with --build-from-source):
+  --mode subdomain|path|ports
+  --domain se-tools.net
+  --ssl --email admin@se-tools.net
+
+Examples:
+  ./deploy/remote-install.sh
+  ./deploy/remote-install.sh --mode subdomain --domain se-tools.net
+  SSH_KEY=~/.ssh/id_ed25519 ./deploy/remote-install.sh --mode path
+  ./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
+EOF
+}
+
+[[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && usage && exit 0
+
+if [[ -n "${SSH_KEY:-}" ]]; then
+  SSH_OPTS+=(-i "${SSH_KEY}")
+fi
+
+SSH_TARGET="${VM_USER}@${VM_HOST}"
+
+log "Target: ${SSH_TARGET}"
+log "Testing SSH connection..."
+ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "echo 'SSH OK — $(hostname) running $(lsb_release -ds 2>/dev/null || echo Linux)'" \
+  || die "Cannot SSH to ${SSH_TARGET}. Check VPN/network, username, and key/password."
+
+ALREADY_INSTALLED=false
+if ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+    "test -f /etc/careconnect/careconnect.env && test -x /opt/careconnect/deploy/deploy-artifact.sh" 2>/dev/null; then
+  ALREADY_INSTALLED=true
+fi
+
+if [[ "${ALREADY_INSTALLED}" == "true" && "${BUILD_FROM_SOURCE}" != "true" ]]; then
+  log "CareConnect is already installed on ${SSH_TARGET} — deploying the latest CI-built"
+  log "artifact (the same one cd-pipeline.yml ships to preprod/prod), not rebuilding on the VM."
+  log "Use --build-from-source to rebuild in place instead."
+
+  command -v gh >/dev/null 2>&1 \
+    || die "GitHub CLI (gh) is required for artifact-based deploys: https://cli.github.com — then: gh auth login
+Or pass --build-from-source to rebuild on the VM without gh."
+
+  ARTIFACT_PATH="$("${SCRIPT_DIR}/fetch-ci-artifact.sh")" \
+    || die "Could not fetch a CI-built artifact (see above). To rebuild from source instead, re-run with --build-from-source."
+
+  log "Copying artifact to ${SSH_TARGET}:/tmp/careconnect-artifact.tar.gz..."
+  scp "${SSH_OPTS[@]}" "${ARTIFACT_PATH}" "${SSH_TARGET}:/tmp/careconnect-artifact.tar.gz" \
+    || die "Failed to copy artifact to ${SSH_TARGET}."
+
+  log "Deploying artifact on VM (sudo password may be prompted)..."
+  ssh -t "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+    "sudo /opt/careconnect/deploy/deploy-artifact.sh /tmp/careconnect-artifact.tar.gz" \
+    || die "Deploy failed on ${SSH_TARGET} — see error output above. sudo deploy/rollback.sh on the VM can recover a bad deploy."
+else
+  if [[ "${BUILD_FROM_SOURCE}" == "true" ]]; then
+    log "Rebuilding from source on the VM (--build-from-source)..."
+  else
+    log "CareConnect is not yet installed on ${SSH_TARGET} — running the full installer."
+  fi
+
+  # Transfer over a tar/ssh pipe rather than rsync: Windows rsync builds (e.g. the
+  # Cygwin-based Chocolatey package) misparse local drive-letter paths as remote
+  # specs once a real remote destination is involved, and separately fail with a
+  # fd dup() error under non-interactive shells. tar+ssh needs no extra tooling
+  # and works the same on macOS/Linux/Windows clients.
+  log "Copying project to ${SSH_TARGET}:${REMOTE_DIR}..."
+  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "rm -rf '${REMOTE_DIR}' && mkdir -p '${REMOTE_DIR}'" \
+    || die "Could not prepare ${REMOTE_DIR} on ${SSH_TARGET}."
+  tar -C "${PROJECT_ROOT}" \
+    --exclude node_modules \
+    --exclude dist \
+    --exclude .git \
+    --exclude .turbo \
+    --exclude .remember \
+    -cf - . | ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "tar -C '${REMOTE_DIR}' -xf -" \
+    || die "Transfer to ${SSH_TARGET}:${REMOTE_DIR} failed."
+
+  # Normalize CRLF line endings in case the local checkout has git autocrlf=true
+  # (common on Windows) — a CRLF shebang or sourced .env line fails on the VM.
+  ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+    "find '${REMOTE_DIR}' -type f \( -name '*.sh' -o -name '*.env' -o -name '*.env.example' -o -name '*.template' \) -exec sed -i 's/\r\$//' {} +"
+
+  log "Running installer on VM (sudo password may be prompted)..."
+  ssh -t "${SSH_OPTS[@]}" "${SSH_TARGET}" \
+    "cd '${REMOTE_DIR}' && sudo deploy/install.sh ${INSTALL_ARGS[*]:-}"
+fi
+
+log "Done. Fetching install summary from VM..."
+VM_IP="${VM_HOST}"
+ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "hostname -I 2>/dev/null | awk '{print \$1}'" | read -r VM_IP || true
+VM_IP="${VM_IP:-${VM_HOST}}"
+
+cat <<EOF
+
+CareConnect remote install finished.
+
+SSH in to verify:
+  ssh ${SSH_TARGET}
+
+VM IP: ${VM_IP}
+Mode:  ${DEPLOY_MODE}
+Domain: ${DOMAIN}
+
+EOF
+
+case "${DEPLOY_MODE}" in
+  subdomain)
+    cat <<EOF
+Browser URLs (DNS must point to ${VM_IP}):
+  http://${PORTAL_HOST}.${DOMAIN}:${PORTAL_PORT}
+  http://${EHR_HOST}.${DOMAIN}:${EHR_PORT}
+
+EOF
+    ;;
+  path)
+    cat <<EOF
+Browser URLs:
+  http://${DOMAIN}/           (portal)
+  http://${DOMAIN}/ehr/
+
+EOF
+    ;;
+  ports)
+    cat <<EOF
+Browser URLs:
+  http://${VM_IP}:${PORTAL_PORT}   (portal)
+  http://${VM_IP}:${EHR_PORT}       (ehr)
+
+EOF
+    ;;
+esac

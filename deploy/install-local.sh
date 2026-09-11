@@ -30,7 +30,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help)
-      echo "Usage: deploy/install-local.sh [--config deploy/se-tools.net.env]"
+      echo "Usage: deploy/install-local.sh [--config deploy/<environment>.env]"
       exit 0
       ;;
     *) die "Unknown option: $1" ;;
@@ -103,7 +103,7 @@ trap cleanup EXIT INT TERM
 
 cd "${ROOT}"
 echo "API      http://localhost:${PORT:-5000}"
-echo "EHR      http://localhost:4000  (admin@se-tools.net / CareConnect1!)"
+echo "EHR      http://localhost:4000  (staff login: admin@se-tools.net / seeded demo password)"
 echo "Portal   http://localhost:4001"
 echo ""
 
@@ -137,9 +137,9 @@ Or start individually (source API env first for api:dev):
   npm run ehr:dev      # :4000
   npm run portal:dev   # :4001
 
-Login: admin@se-tools.net / CareConnect1!
+Login: admin@se-tools.net / seeded demo password
 
 Production deploy (Ubuntu VM):
-  ./deploy/remote-install.sh --config deploy/se-tools.net.env
+  ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 
 EOF

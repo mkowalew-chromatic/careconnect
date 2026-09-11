@@ -3,14 +3,14 @@
 # CareConnect installer — Ubuntu VM (production) or --local (macOS dev)
 #
 # Production (Ubuntu VM):
-#   sudo ./deploy/install.sh --config deploy/se-tools.net.env
+#   sudo ./deploy/install.sh --config deploy/<environment>.env
 #
 # Local development (macOS/Linux, no sudo):
 #   ./deploy/install.sh --local
-#   ./deploy/install.sh --local --config deploy/se-tools.net.env
+#   ./deploy/install.sh --local --config deploy/<environment>.env
 #
 # Remote VM deploy from Mac:
-#   ./deploy/remote-install.sh --config deploy/se-tools.net.env
+#   ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 #
 set -euo pipefail
 
@@ -92,8 +92,8 @@ Options:
 
 Examples:
   deploy/install.sh --local
-  sudo deploy/install.sh --config deploy/se-tools.net.env
-  ./deploy/remote-install.sh --config deploy/se-tools.net.env
+  sudo deploy/install.sh --config deploy/<environment>.env
+  ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 EOF
 }
 
@@ -129,7 +129,7 @@ For local development on macOS:
   deploy/install.sh --local
 
 To deploy to an Ubuntu VM:
-  ./deploy/remote-install.sh --config deploy/se-tools.net.env"
+  ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env"
 fi
 
 if ! is_debian_ubuntu; then
@@ -138,10 +138,10 @@ if ! is_debian_ubuntu; then
 You appear to be on: $(uname -s)
 
 For local development:
-  deploy/install.sh --local --config deploy/se-tools.net.env
+  deploy/install.sh --local --config deploy/<environment>.env
 
 To deploy to your Ubuntu VM:
-  ./deploy/remote-install.sh --config deploy/se-tools.net.env"
+  ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env"
 fi
 
 # Load or seed config

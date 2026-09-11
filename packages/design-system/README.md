@@ -63,21 +63,26 @@ apps typecheck or bundle. `turbo` handles that ordering — a plain
 
 ## Development
 
-Development needs **Node 22.22.2 or newer** (see the repo root `.nvmrc`, which
-CI reads too) — the toolchain's `jsdom`/`undici` require it. That is stricter
-than the `engines` field, which describes what *consumers* need at runtime.
+Use the Node version in the repo root `.nvmrc` (currently **24**; CI reads the
+same file). The floor is 22.22 — the toolchain's `jsdom`/`undici` break on
+anything older. That is stricter than the root `engines` field, which
+describes what *consumers* need at runtime.
 
 From the repo root:
 
 ```bash
-nvm use                 # or any Node >= 22.22.2
+nvm use                 # Node version from .nvmrc
 npm install             # installs every workspace
 npm run storybook       # component playground on :6006
 npm run ds:build        # produces packages/design-system/dist/
-npm run typecheck       # tsc --noEmit across workspaces
-npm test                # unit tests (jsdom)
+npm run typecheck       # tsc --noEmit in this package and every other TS workspace
+npm test                # unit tests (this package's jsdom suite + the API's)
 npm run build-storybook # static Storybook site in storybook-static/
 ```
+
+The EHR and Portal dev servers (`npm run ehr:dev`, `npm run portal:dev`) load
+this package from `dist/`, so run `npm run ds:build` after a component change
+to see it in an app — or iterate in Storybook, which reads `src/` directly.
 
 Or scope any of this package's own scripts with `-w @careconnect/design-system`:
 

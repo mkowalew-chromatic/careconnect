@@ -1,11 +1,26 @@
 # Changelog
 
-All notable changes to CareConnect are documented in this file.
+CareConnect's release history is written by [Changesets](https://github.com/changesets/changesets)
+into per-package changelogs. Start here:
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+| Changelog | Covers |
+|---|---|
+| [apps/api/CHANGELOG.md](apps/api/CHANGELOG.md) | The **CareConnect app version** — `@careconnect/api`, `ehr`, `portal`, `smoke-tests`, `types`, `api-client`, and `mock-data` share one version (a Changesets fixed group). Each `vX.Y.Z` git tag and GitHub Release corresponds to a section here. The other workspaces in the group have their own `CHANGELOG.md` too, but they only record dependency bumps. |
+| [packages/design-system/CHANGELOG.md](packages/design-system/CHANGELOG.md) | `@careconnect/design-system`, which versions independently of the app. |
 
-## [Unreleased]
+See [docs/RELEASE.md](docs/RELEASE.md) for how releases are cut.
+
+---
+
+## Pre-monorepo history (frozen)
+
+The entries below are from the EMR demo repository before it was merged with
+the design system into this monorepo at `v1.0.0`. They are kept for reference
+and are **not updated** — names like `@careconnect/billing` and `packages/ui`
+refer to the layout at that time (billing has since been folded into the EHR
+app as a role-gated section, and the UI library is now
+`packages/design-system`). This section follows the
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
 ## [0.3.0] - 2026-08-21
 
@@ -39,7 +54,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - API `/health` reads version from package metadata (unified monorepo version)
 - `@careconnect/types` compiled to JavaScript for production API runtime
-
-[Unreleased]: https://github.com/mkowalew-dev/healthcare-demo/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/mkowalew-dev/healthcare-demo/releases/tag/v0.3.0
-[0.2.0]: https://github.com/mkowalew-dev/healthcare-demo/releases/tag/v0.2.0

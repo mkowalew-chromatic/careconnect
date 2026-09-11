@@ -2,6 +2,11 @@
 
 This guide covers installing CareConnect locally for development, deploying to an Ubuntu VM (directly or over SSH), and applying updates.
 
+> **Read first — two things this guide assumes that a fresh clone doesn't have:**
+>
+> 1. **Per-environment config files.** `deploy/se-tools.net.env` and `deploy/staging.se-tools.net.env` appear throughout the examples but are **gitignored** (they hold environment-specific settings). Create them from [`careconnect.env.example`](careconnect.env.example) before running any command that references them.
+> 2. **The CD pipeline is not ported yet.** The artifact-based deploy path (`fetch-ci-artifact.sh`, `deploy-artifact.sh`, and the "already installed" branch of `remote-install.sh`) expects a GitHub Actions workflow named `cd-pipeline.yml` that does not exist in this repo yet. Until it is ported (see [docs/RELEASE.md § Planned automation](../docs/RELEASE.md#planned-automation)), **always pass `--build-from-source` to `remote-install.sh`**; without it the script stops with "No successful CD Pipeline run found". The artifact scripts are documented below so the pipeline can be restored.
+
 ---
 
 ## Table of Contents
@@ -25,9 +30,9 @@ This guide covers installing CareConnect locally for development, deploying to a
 
 | Script | Runs on | Requires sudo | Purpose |
 |---|---|---|---|
-| `deploy/install.sh --local` | Your Mac/Linux | No | Dev deps + API env + start script |
-| `deploy/remote-install.sh` | Your laptop | No (SSH to VM uses sudo there) | Fresh VM: full source install. Already-installed VM: fetches and ships the latest CI-built artifact (no rebuild) |
-| `deploy/fetch-ci-artifact.sh` | Your laptop | No | Downloads the latest CD Pipeline artifact; requires `gh` authenticated |
+| `deploy/install.sh --local` | Your Mac/Linux | No | Dev deps, builds types + design system + API, writes API env + start script |
+| `deploy/remote-install.sh --build-from-source` | Your laptop | No (SSH to VM uses sudo there) | Ships your checkout to the VM and runs the full source install/rebuild there. (Without the flag, an already-installed VM gets the CI-built artifact instead — **not available until `cd-pipeline.yml` is ported**) |
+| `deploy/fetch-ci-artifact.sh` | Your laptop | No | Downloads the latest CD Pipeline artifact; requires `gh` authenticated — **inert until `cd-pipeline.yml` is ported** |
 | `deploy/install.sh` | Ubuntu VM | **Yes** | Full production install (builds from source) |
 | `deploy/update.sh` | Ubuntu VM | **Yes** | Rebuild from source and redeploy in place |
 | `deploy/uninstall.sh` | Ubuntu VM | **Yes** | Remove CareConnect |
@@ -42,13 +47,13 @@ This guide covers installing CareConnect locally for development, deploying to a
 
 ### Local development (Mac/Linux)
 
-- Node.js 20+ (22 recommended)
+- Node.js **24** — the version in the repo's [`.nvmrc`](../.nvmrc) (`nvm use`); CI uses the same file. Older than 22.22 fails the design-system tests.
 - npm 10+
 - `openssl` (usually preinstalled)
 
 ### Production VM (Ubuntu 22.04+ recommended)
 
-- Ubuntu or Debian with `apt-get`
+- Ubuntu or Debian with `apt-get` (the installer adds Node.js `NODE_MAJOR`, default 22 — enough to build and run; the stricter Node 24 above is only for the local test toolchain)
 - Root/sudo access
 - **2 GB+ RAM** recommended for `npm ci` + builds
 - Open ports: HTTP (80 or custom, e.g. 8080), API internal (5000, localhost only)
@@ -74,7 +79,7 @@ deploy/install.sh --local
 This will:
 
 1. Run `npm ci --include=dev`
-2. Build `@careconnect/types` and the API
+2. Build `@careconnect/types`, `@careconnect/design-system`, and the API (the EHR and Portal dev servers import the design system's `dist/`, so it must exist before they start)
 3. Write `deploy/runtime/careconnect-api.env` (JWT secret, DB path)
 4. Create `deploy/start-local.sh`
 
@@ -112,6 +117,8 @@ npm run ehr:dev
 npm run portal:dev
 ```
 
+These per-app scripts bypass turbo. After editing a design-system component run `npm run ds:build` (or iterate in `npm run storybook`); after editing `@careconnect/types` run `npm run build --workspace=@careconnect/types`.
+
 ### Local paths
 
 | Item | Path |
@@ -129,18 +136,16 @@ npm run portal:dev
 Run from your **laptop**, not on the VM:
 
 ```bash
-./deploy/remote-install.sh --config deploy/se-tools.net.env
+./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
 ```
 
 ### What happens
 
 1. **SSH test** to `cisco@192.168.11.8` (defaults; override below)
 2. **Checks** whether CareConnect is already installed on the VM
-3. **Already installed** (the common case): downloads the latest [CD Pipeline](#artifact-based-deploys-ci) artifact via `deploy/fetch-ci-artifact.sh`, copies it over, and runs `deploy-artifact.sh` on the VM — the same deploy CI itself performs, so this can't drift from what CI validated. Requires the `gh` CLI, authenticated (`gh auth login`).
-   **Not yet installed** (fresh VM), or `--build-from-source` passed: transfers the project over a tar/ssh pipe and runs the full `deploy/install.sh --config deploy/se-tools.net.env` on the VM (builds from source; several minutes).
+3. **`--build-from-source` passed, or not yet installed** (fresh VM): transfers the project over a tar/ssh pipe and runs the full `deploy/install.sh --config deploy/se-tools.net.env` on the VM (builds types + design system + apps from source; several minutes).
+   **Already installed and no flag:** downloads the latest [CD Pipeline](#artifact-based-deploys-ci) artifact via `deploy/fetch-ci-artifact.sh`, copies it over, and runs `deploy-artifact.sh` on the VM — the same deploy CI would perform, so it can't drift from what CI validated. Requires the `gh` CLI, authenticated (`gh auth login`). **This branch fails today** because `cd-pipeline.yml` has not been ported, which is why every example in this guide passes `--build-from-source`.
 4. Prints summary URLs on your laptop
-
-Pass `--build-from-source` to always rebuild from your local checkout instead of deploying a CI artifact — useful for testing local, not-yet-pushed changes, or if no CD Pipeline run exists yet for the commit you want to deploy.
 
 ### Environment variables
 
@@ -155,14 +160,14 @@ Examples:
 
 ```bash
 # se-tools.net subdomain config
-./deploy/remote-install.sh --config deploy/se-tools.net.env
+./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
 
 # Custom host + key
 VM_USER=cisco VM_HOST=192.168.11.8 SSH_KEY=~/.ssh/id_ed25519 \
-  ./deploy/remote-install.sh --config deploy/se-tools.net.env
+  ./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
 
 # Path mode on VM IP (no DNS)
-./deploy/remote-install.sh --mode path --domain 192.168.11.8
+./deploy/remote-install.sh --build-from-source --mode path --domain 192.168.11.8
 ```
 
 ### SSH key setup (one time)
@@ -191,7 +196,7 @@ Or copy the repo with `rsync`/`scp` and run the same command.
 1. Installs Node.js 22, nginx, curl, openssl, rsync, ufw
 2. Creates system user `careconnect`
 3. Syncs app to `/opt/careconnect`
-4. Runs `npm ci`, builds all apps (API, EHR, Portal)
+4. Runs `npm ci` and `npm run build` (turbo builds `@careconnect/types` and the design system first, then API, EHR, Portal), then prunes dev dependencies
 5. Publishes static files to `/var/www/careconnect/{portal,ehr}`
 6. Writes `/etc/careconnect/careconnect.env` and `careconnect-api.env`
 7. Enables and starts **systemd** services: `careconnect-api`, `nginx`
@@ -339,14 +344,14 @@ See [`careconnect.env.example`](careconnect.env.example) for all options.
 
 ## Updates
 
-After a [release](docs/RELEASE.md) or when pulling new code:
+After a [release](../docs/RELEASE.md) or when pulling new code:
 
 ### Deploy a specific release tag (recommended)
 
 ```bash
 cd /opt/careconnect
 sudo -u careconnect git fetch --tags
-sudo -u careconnect git checkout v0.2.0   # replace with target release
+sudo -u careconnect git checkout vX.Y.Z   # replace with target release
 sudo /opt/careconnect/deploy/update.sh
 ```
 
@@ -362,7 +367,7 @@ sudo /opt/careconnect/deploy/update.sh
 
 `update.sh` will:
 
-1. Run `deploy/build-production.sh` (npm ci, build all apps, prune dev deps)
+1. Run `deploy/build-production.sh` (npm ci, `npm run build` for every workspace via turbo, prune dev deps)
 2. Rsync static dists to `/var/www/careconnect`
 3. Restart `careconnect-api`
 4. Reload nginx
@@ -370,10 +375,10 @@ sudo /opt/careconnect/deploy/update.sh
 
 ### From your laptop (redeploy)
 
-Re-running remote install is safe. On an already-installed VM this deploys the latest CI-built artifact (no rebuild); pass `--build-from-source` to rebuild from your local checkout instead:
+Re-running remote install is safe. With `--build-from-source` it rebuilds on the VM from your local checkout (the artifact path it uses otherwise needs the not-yet-ported CD pipeline):
 
 ```bash
-./deploy/remote-install.sh --config deploy/se-tools.net.env
+./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
 ```
 
 ### What updates do **not** reset
@@ -386,13 +391,15 @@ Re-running remote install is safe. On an already-installed VM this deploys the l
 
 Schema changes run automatically on API startup via `migrateModules()` in the API. No separate migration command is required for local/manual deployments (`update.sh`, `remote-install.sh`, `install.sh`) — this boot-time behavior is unchanged and still applies there.
 
-The CI-driven artifact deploy path (`deploy-artifact.sh`, described below) additionally runs migrations as an explicit, abortable pre-flight step *before* the service restarts, rather than relying on boot-time migration alone. This is the path production and pre-prod deploys actually use.
+The artifact deploy path (`deploy-artifact.sh`, described below) additionally runs migrations as an explicit, abortable pre-flight step *before* the service restarts, rather than relying on boot-time migration alone. This is the path production and pre-prod deploys will use once the CD pipeline is ported.
 
 ---
 
 ## Artifact-Based Deploys (CI)
 
-The app is built **once** into a versioned tarball ("artifact") and that same artifact is shipped, unchanged, to each environment — rather than rebuilding from source on every target VM. This is how `cd-pipeline.yml` deploys to preprod/prod, and (as of the manual path's redeploy behavior above) also what `remote-install.sh` deploys to an already-installed VM — so a human-triggered redeploy and the automated pipeline can no longer disagree about what's actually running.
+> **Not active yet.** The scripts in this section are in the repo and work when given an artifact, but the `cd-pipeline.yml` workflow that produces and uploads artifacts has not been ported to this repo. Until it is, `fetch-ci-artifact.sh` finds nothing and `remote-install.sh` must be run with `--build-from-source`. See [docs/RELEASE.md § Planned automation](../docs/RELEASE.md#planned-automation) for what the workflow should do.
+
+The app is built **once** into a versioned tarball ("artifact") and that same artifact is shipped, unchanged, to each environment — rather than rebuilding from source on every target VM. This is how `cd-pipeline.yml` deploys to preprod/prod, and also what `remote-install.sh` deploys to an already-installed VM when `--build-from-source` is not passed — so a human-triggered redeploy and the automated pipeline cannot disagree about what's actually running.
 
 | Script | Runs on | Purpose |
 |---|---|---|
@@ -407,7 +414,7 @@ The app is built **once** into a versioned tarball ("artifact") and that same ar
 deploy/package-artifact.sh [output-dir] [config-file]
 ```
 
-Builds the monorepo once (via `build-production.sh`) and packages the result into a versioned tarball named `careconnect-<version>-<git-sha>.tar.gz`. The tarball's path is printed as the script's last line of output, so callers can capture it directly (e.g. `ARTIFACT="$(deploy/package-artifact.sh)"`).
+Builds the monorepo once (via `build-production.sh`, which builds the design system into the app bundles) and packages the result into a versioned tarball named `careconnect-<version>-<git-sha>.tar.gz`. The tarball's path is printed as the script's last line of output, so callers can capture it directly (e.g. `ARTIFACT="$(deploy/package-artifact.sh)"`).
 
 Defaults to `deploy/se-tools.net.env` if no config file is given. **Build behavior depends on `DEPLOY_MODE`** — specifically `VITE_EHR_BASE` and `VITE_PORTAL_BASE` are baked into the JS bundles at build time — so the config passed here must match the target environment (e.g. `deploy/staging.se-tools.net.env` for pre-prod). The resulting `MANIFEST.json` inside the artifact records `deployMode`, which `deploy-artifact.sh`/`rollback.sh` verify against the target's own config before deploying.
 
@@ -453,7 +460,7 @@ systemctl is-enabled careconnect-api nginx
 
 ```bash
 curl http://127.0.0.1:5000/health
-# {"status":"ok","service":"careconnect-api","version":"0.2.0"}
+# {"status":"ok","service":"careconnect-api","version":"1.0.2"}   ← version = apps/api/package.json
 ```
 
 ### After VM reboot
@@ -513,7 +520,7 @@ You ran the production installer locally. Use:
 ```bash
 deploy/install.sh --local
 # or
-./deploy/remote-install.sh --config deploy/se-tools.net.env
+./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
 ```
 
 ### API health check failed after install
@@ -569,7 +576,7 @@ curl -s -X POST http://ehr.se-tools.net:8080/api/auth/login \
 ```
 
 - Default staff password: seeded demo password (ask a teammate)
-- Re-deploy UI after fixes: `./deploy/remote-install.sh --config deploy/se-tools.net.env`
+- Re-deploy UI after fixes: `./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env`
 - If JWT secret changed, log in again (old tokens invalid)
 
 ### Subdomain URLs don't resolve
@@ -596,7 +603,8 @@ sudo /opt/careconnect/deploy/update.sh
 |---|---|
 | Local dev setup | `deploy/install.sh --local` |
 | Start local dev | `./deploy/start-local.sh` |
-| Deploy to VM from laptop | `./deploy/remote-install.sh --config deploy/se-tools.net.env` |
+| Rebuild design system for dev servers | `npm run ds:build` |
+| Deploy to VM from laptop | `./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env` |
 | Install on VM | `sudo deploy/install.sh --config deploy/se-tools.net.env` |
 | Update on VM | `sudo /opt/careconnect/deploy/update.sh` |
 | Deploy release tag | `git checkout vX.Y.Z && sudo deploy/update.sh` |
@@ -613,10 +621,10 @@ sudo /opt/careconnect/deploy/update.sh
 
 ```bash
 git checkout main && git pull
-SSH_KEY=~/.ssh/id_ed25519_singlevm ./deploy/remote-install.sh --config deploy/se-tools.net.env
+SSH_KEY=~/.ssh/id_ed25519_singlevm ./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
 ```
 
-- Run from the repo root, with `gh` authenticated (`gh auth login`). Pull `main` first — the script deploys the latest CI-built artifact for your current `HEAD` commit, and refuses if CI/CD hasn't finished for it yet, so an unpushed or unmerged local commit won't deploy.
+- Run from the repo root. `--build-from-source` ships whatever is in your working tree, so pull `main` (or check out the tag you want, `git checkout vX.Y.Z`) first — see [Updates](#updates). It runs `npm ci` and a full turbo build on the VM (several minutes).
 - `SSH_KEY=~/.ssh/id_ed25519_singlevm` is the working key for `cisco@192.168.11.8`; sudo is passwordless on that VM, so no password prompt.
-- To deploy a specific release instead of the latest `main`, check out the tag first (`git checkout vX.Y.Z`) before running the command above — see [Updates](#updates). Note this still requires a CD Pipeline run for that exact commit; for an old tag that predates this artifact-based flow, use `--build-from-source`.
-- This deploys the pre-built artifact in seconds — it no longer runs `npm ci` or builds on the VM. Pass `--build-from-source` to rebuild from your local checkout instead (several minutes; needed for a brand-new VM or to test not-yet-pushed changes).
+- `deploy/se-tools.net.env` is gitignored; create it from `careconnect.env.example` on any new laptop.
+- Once `cd-pipeline.yml` is ported, drop `--build-from-source` and authenticate `gh` (`gh auth login`): the script will then deploy the CI-built artifact for your `HEAD` commit in seconds, and refuse if CI/CD hasn't finished for that commit.

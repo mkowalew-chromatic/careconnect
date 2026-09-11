@@ -2,7 +2,17 @@
   "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [],
+  "fixed": [
+    [
+      "@careconnect/api",
+      "@careconnect/ehr",
+      "@careconnect/portal",
+      "@careconnect/smoke-tests",
+      "@careconnect/types",
+      "@careconnect/api-client",
+      "@careconnect/mock-data"
+    ]
+  ],
   "linked": [],
   "access": "restricted",
   "baseBranch": "main",

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # CareConnect local development setup (macOS or Linux, no root required).
-# Installs npm deps, builds shared types, writes runtime env for the API.
+# Installs npm deps, builds shared types + design system, writes runtime env for the API.
 #
 set -euo pipefail
 
@@ -78,6 +78,13 @@ npm ci --include=dev
 
 log "Building shared types..."
 npm run build --workspace=@careconnect/types
+
+# EHR and Portal resolve @careconnect/design-system through its package
+# exports, which point at dist/ -- so the library must be built before the
+# Vite dev servers can start. (turbo does this for `npm run build`, but the
+# per-app dev scripts bypass turbo.)
+log "Building design system..."
+npm run build --workspace=@careconnect/design-system
 
 log "Building API..."
 npm run build --workspace=@careconnect/api

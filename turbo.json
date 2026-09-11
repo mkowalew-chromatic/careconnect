@@ -2,34 +2,54 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**"
+      ]
     },
     "dev": {
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "cache": false,
       "persistent": true
     },
-    "lint": {
-      "dependsOn": ["^build"]
-    },
     "typecheck": {
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build"
+      ]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build"
+      ]
     },
     "@careconnect/design-system#test": {
-      "dependsOn": ["^build"],
-      "outputs": ["test-results/**", "coverage/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "test-results/**",
+        "coverage/**"
+      ]
     },
     "test:stories": {
-      "dependsOn": ["^build"],
-      "outputs": ["test-results/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "test-results/**"
+      ]
     },
     "build-storybook": {
-      "dependsOn": ["^build"],
-      "outputs": ["storybook-static/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "storybook-static/**"
+      ]
     }
   }
 }

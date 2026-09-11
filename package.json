@@ -14,7 +14,6 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
-    "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test": "turbo test --filter=!@careconnect/smoke-tests",
     "api:dev": "npm run dev --workspace=@careconnect/api",

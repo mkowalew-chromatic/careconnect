@@ -9,6 +9,8 @@ The apps and the component library they are built from live together in this mon
 
 **Current version:** 1.0.2 — see [CHANGELOG.md](CHANGELOG.md) and [Release process](docs/RELEASE.md).
 
+> ⚠️ **Environment config:** the `deploy/se-tools.net.env` and `deploy/staging.se-tools.net.env` files referenced in the commands below are per-environment secrets and are gitignored. Copy [`deploy/careconnect.env.example`](deploy/careconnect.env.example) to create them.
+
 ---
 
 ## Table of Contents
@@ -22,7 +24,8 @@ The apps and the component library they are built from live together in this mon
 - [Design System](#design-system)
 - [Deployment](#deployment)
 - [Versioning & Releases](#versioning--releases)
-- [License & Acknowledgments](#license--acknowledgments)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
 
 ---
 
@@ -156,7 +159,7 @@ The database is created and seeded automatically on first API start.
 
 ### Prerequisites
 
-- **Node.js 20+** (22 recommended)  
+- **Node.js 24** — the version in [`.nvmrc`](.nvmrc), which CI also uses (`nvm use`). The root `engines` field allows 20+ for *running* the built API, but the design-system test toolchain needs 22.22+, so use `.nvmrc` for development.
 - **npm 10+**
 
 ### Option A — One-command local setup (macOS/Linux)
@@ -164,15 +167,16 @@ The database is created and seeded automatically on first API start.
 ```bash
 git clone https://github.com/mkowalew-chromatic/careconnect.git
 cd careconnect
-deploy/install.sh --local
-./deploy/start-local.sh
+deploy/install.sh --local      # npm ci, builds types + design system + API, writes API env
+./deploy/start-local.sh        # API :5000, EHR :4000, Portal :4001
 ```
 
 ### Option B — Manual dev servers
 
 ```bash
 npm install
-npm run build --workspace=@careconnect/types   # required for API
+npm run build --workspace=@careconnect/types   # required by the API
+npm run ds:build                                # required by EHR + Portal (they import the library's dist/)
 
 # Terminal 1 — API (set env for JWT + DB path)
 set -a && source deploy/runtime/careconnect-api.env && set +a
@@ -181,6 +185,17 @@ npm run api:dev
 # Additional terminals
 npm run ehr:dev       # http://localhost:4000
 npm run portal:dev    # http://localhost:4001
+```
+
+The per-app `*:dev` scripts call the workspace directly and bypass turbo, so they do **not** rebuild `@careconnect/types` or the design system for you. Re-run `npm run ds:build` after changing a component (or keep `npm run storybook` open and iterate there), and `npm run build --workspace=@careconnect/types` after changing shared types.
+
+### Other useful root scripts
+
+```bash
+npm run build         # turbo: builds every workspace in dependency order
+npm run typecheck     # tsc --noEmit in every TypeScript workspace
+npm test              # unit tests (API + design system); excludes smoke tests
+npm run smoke:test    # Playwright smoke tests against a running stack (apps/smoke-tests)
 ```
 
 ### Demo walkthrough
@@ -222,7 +237,7 @@ careconnect/
 - **Primary:** Teal `#0D7377`  
 - **Accent:** Coral `#E07A5F`  
 - **Font:** Instrument Sans  
-- **Components:** Button, Badge, Card, Input, Select, Table, Tabs, Avatar, Navbar, PageContainer  
+- **Components:** ~40 components — form controls, layout, navigation, data display (Table, DataGrid, charts), and clinical widgets (PatientBanner, VitalSigns, ScheduleCalendar, …). The full list is the export barrel in [`packages/design-system/src/index.ts`](packages/design-system/src/index.ts); browse them in Storybook.
 
 Components live in this repo at [`packages/design-system`](packages/design-system) as the private workspace package `@careconnect/design-system`, documented in its own Storybook with healthcare-specific examples.
 
@@ -256,8 +271,10 @@ CareConnect supports three deployment paths:
 **Production example (se-tools.net):**
 
 ```bash
-./deploy/remote-install.sh --config deploy/se-tools.net.env
+./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
 ```
+
+`--build-from-source` is required until the CD pipeline workflow is ported (see [docs/RELEASE.md](docs/RELEASE.md#planned-automation)); without it the script looks for a CI-built artifact that does not exist yet.
 
 See **[deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md)** for install modes, DNS, SSL, updates, troubleshooting, and file paths.
 
@@ -269,14 +286,16 @@ CareConnect uses **Semantic Versioning** and **[Changesets](https://github.com/c
 
 | Resource | Description |
 |----------|-------------|
-| [CHANGELOG.md](CHANGELOG.md) | Release history (Keep a Changelog format) |
+| [apps/api/CHANGELOG.md](apps/api/CHANGELOG.md) | Release history for the app version (written by Changesets) |
+| [packages/design-system/CHANGELOG.md](packages/design-system/CHANGELOG.md) | Design system release history (written by Changesets) |
+| [CHANGELOG.md](CHANGELOG.md) | Index of the above + frozen pre-1.0 history from before the monorepo merge |
 | [docs/RELEASE.md](docs/RELEASE.md) | How to add changesets, cut releases, and deploy tags |
 
 **Contributors:** after user-facing changes, run `npm run changeset` and commit the generated file with your PR.
 
-**CI:** GitHub Actions builds on every PR to `main`. Merging changesets opens a Version Packages PR; merging that creates a `vX.Y.Z` tag and GitHub Release.
+**CI:** GitHub Actions (`ci.yml`) typechecks, tests, and builds every workspace on each PR to `main`. Releases are currently cut by hand — `npm run version-packages` then `npm run release:publish` — which tags `vX.Y.Z` and creates the GitHub Release. `@careconnect/design-system` keeps its own version and changelog; every other workspace shares one version (see [docs/RELEASE.md](docs/RELEASE.md)).
 
-Agent rules: follow [AGENTS.md](AGENTS.md) (canonical). Also mirrored in [CLAUDE.md](CLAUDE.md). Keep both in sync when changing agent rules.
+Agent rules: follow [AGENTS.md](AGENTS.md).
 
 ---
 

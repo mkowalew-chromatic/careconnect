@@ -9,7 +9,7 @@ The apps and the component library they are built from live together in this mon
 
 **Current version:** 1.0.2 — see [CHANGELOG.md](CHANGELOG.md) and [Release process](docs/RELEASE.md).
 
-> ⚠️ **Environment config:** the `deploy/se-tools.net.env` and `deploy/staging.se-tools.net.env` files referenced in the commands below are per-environment secrets and are gitignored. Copy [`deploy/careconnect.env.example`](deploy/careconnect.env.example) to create them.
+> ⚠️ **Environment config:** deploy commands take a `--config deploy/<environment>.env` file holding that environment's domain, ports, and mode. These files are per-environment secrets and are gitignored — only [`deploy/careconnect.env.example`](deploy/careconnect.env.example) is committed. Copy it to create yours.
 
 ---
 
@@ -268,10 +268,10 @@ CareConnect supports three deployment paths:
 | **Remote SSH** | Deploy from laptop to Ubuntu VM | [DEPLOYMENT.md § Remote](deploy/DEPLOYMENT.md#remote-deployment-ssh) |
 | **On-VM install** | Already SSH'd into Ubuntu | [DEPLOYMENT.md § On-VM](deploy/DEPLOYMENT.md#on-vm-installation) |
 
-**Production example (se-tools.net):**
+**Deploy to a VM from your laptop:**
 
 ```bash
-./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
+./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 ```
 
 `--build-from-source` is required until the CD pipeline workflow is ported (see [docs/RELEASE.md](docs/RELEASE.md#planned-automation)); without it the script looks for a CI-built artifact that does not exist yet.

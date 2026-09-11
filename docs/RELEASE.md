@@ -140,15 +140,15 @@ Commit messages are not enforced, but this alignment helps reviewers pick the ri
 
 ## Deploy after a release
 
-Deploys are manual for now. The `deploy/*.env` config files these commands take
-are gitignored (per-environment secrets) — create them from
+Deploys are manual for now. The `deploy/<environment>.env` config file these
+commands take is gitignored (per-environment secrets) — create it from
 [`deploy/careconnect.env.example`](../deploy/careconnect.env.example).
 
 **From your laptop (rebuild on the VM from your checkout):**
 
 ```bash
 git fetch --tags && git checkout vX.Y.Z
-./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
+./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 ```
 
 `--build-from-source` is required until `cd-pipeline.yml` exists: without it,

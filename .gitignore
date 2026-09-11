@@ -26,8 +26,9 @@ playwright-report/
 .env.local
 
 # Deploy secrets — per-environment config, kept out of the repo
-deploy/se-tools.net.env
-deploy/staging.se-tools.net.env
+# (only the example template is committed)
+deploy/*.env
+!deploy/careconnect.env.example
 deploy/runtime/
 
 # Local agent notes

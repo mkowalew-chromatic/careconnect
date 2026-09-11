@@ -13,7 +13,7 @@ Healthcare EMR demo monorepo: API (Express + SQLite), EHR (includes role-gated B
 | Task | Command / doc |
 |------|----------------|
 | Local dev setup | `deploy/install.sh --local` → `./deploy/start-local.sh` |
-| Remote VM deploy | `./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env` (see [After a release](#after-a-release-deploy)) |
+| Remote VM deploy | `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env` (see [After a release](#after-a-release-deploy)) |
 | Build | `npm run build` (turbo; builds types + design system before the apps) |
 | Typecheck / tests | `npm run typecheck` (every TS workspace) · `npm test` (API + design system unit tests) · `npm run smoke:test` (Playwright, needs a running stack) |
 | Component library / Storybook | `npm run storybook` → http://localhost:6006 |
@@ -55,7 +55,7 @@ git fetch --tags && git checkout vX.Y.Z
 sudo /opt/careconnect/deploy/update.sh
 ```
 
-Or from laptop: `./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env` (the `--build-from-source` flag is required until `cd-pipeline.yml` is ported; without it the script looks for a CI-built artifact that doesn't exist yet). `deploy/*.env` files are gitignored — create them from `deploy/careconnect.env.example`.
+Or from laptop: `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env` (the `--build-from-source` flag is required until `cd-pipeline.yml` is ported; without it the script looks for a CI-built artifact that doesn't exist yet). Environment config files are gitignored — create them from `deploy/careconnect.env.example`, and do not name real hostnames or environments in docs or commit messages.
 
 ### Checklist before marking work complete
 

@@ -4,20 +4,19 @@
 #
 # Run from your Mac/laptop (not on the VM):
 #
-#   ./deploy/remote-install.sh
-#   ./deploy/remote-install.sh --mode subdomain --domain se-tools.net
-#   VM_USER=cisco VM_HOST=192.168.11.8 ./deploy/remote-install.sh
+#   ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
+#   VM_USER=ubuntu VM_HOST=<vm-ip> ./deploy/remote-install.sh --mode path --domain <vm-ip>
+#
+# The SSH target comes from VM_USER / VM_HOST / VM_PORT / SSH_KEY, which can be
+# exported in the environment or set in the (gitignored) --config file. There
+# are deliberately no built-in defaults for the host or user.
 #
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-VM_USER="${VM_USER:-cisco}"
-VM_HOST="${VM_HOST:-192.168.11.8}"
-VM_PORT="${VM_PORT:-22}"
 REMOTE_DIR="/tmp/careconnect-install"
-SSH_OPTS=(-o ConnectTimeout=10 -p "${VM_PORT}")
 
 # --build-from-source opts out of the default artifact-based redeploy (see
 # below) and forces the old behavior: rebuild from whatever is in this local
@@ -33,18 +32,16 @@ for arg in "$@"; do
   fi
 done
 
-# Default: path mode on port 80 using the VM IP
-if [[ ${#ARGS[@]} -eq 0 ]]; then
-  INSTALL_ARGS=(--mode path --domain "${VM_HOST}")
-else
-  INSTALL_ARGS=("${ARGS[@]}")
-fi
+INSTALL_ARGS=("${ARGS[@]}")
 
-# Resolve deploy settings from CLI args + optional --config file (for local summary)
+# Resolve deploy settings from CLI args + optional --config file (for local
+# summary), and pick up the SSH target (VM_*) from the config file if it is
+# not already set in the environment.
 resolve_install_config() {
-  DOMAIN="${VM_HOST}"
+  DOMAIN=""
   DEPLOY_MODE="path"
   local config_path=""
+  local env_vm_user="${VM_USER:-}" env_vm_host="${VM_HOST:-}" env_vm_port="${VM_PORT:-}" env_ssh_key="${SSH_KEY:-}"
   local args=("${INSTALL_ARGS[@]}")
   local i=0
   while [[ $i -lt ${#args[@]} ]]; do
@@ -63,6 +60,11 @@ resolve_install_config() {
       source "${cfg}"
     fi
   fi
+  # Environment beats config file for the SSH target.
+  VM_USER="${env_vm_user:-${VM_USER:-}}"
+  VM_HOST="${env_vm_host:-${VM_HOST:-}}"
+  VM_PORT="${env_vm_port:-${VM_PORT:-22}}"
+  SSH_KEY="${env_ssh_key:-${SSH_KEY:-}}"
   : "${DOMAIN:=${VM_HOST}}"
   : "${DEPLOY_MODE:=path}"
   : "${PORTAL_HOST:=portal}"
@@ -76,6 +78,13 @@ resolve_install_config
 log() { printf '==> %s\n' "$*"; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
+SSH_OPTS=(-o ConnectTimeout=10 -p "${VM_PORT}")
+
+# With no install options at all, default to path mode on the VM address.
+if [[ ${#INSTALL_ARGS[@]} -eq 0 && -n "${VM_HOST}" ]]; then
+  INSTALL_ARGS=(--mode path --domain "${VM_HOST}")
+fi
+
 usage() {
   cat <<EOF
 Install CareConnect on a remote Ubuntu VM via SSH.
@@ -83,9 +92,9 @@ Install CareConnect on a remote Ubuntu VM via SSH.
 Usage:
   ./deploy/remote-install.sh [install options]
 
-Environment:
-  VM_USER   SSH username (default: cisco)
-  VM_HOST   VM IP or hostname (default: 192.168.11.8)
+SSH target (required; export in the environment or set in the --config file):
+  VM_USER   SSH username
+  VM_HOST   VM IP or hostname
   VM_PORT   SSH port (default: 22)
   SSH_KEY   Path to private key (optional)
 
@@ -106,14 +115,16 @@ with --build-from-source):
   --ssl --email admin@se-tools.net
 
 Examples:
-  ./deploy/remote-install.sh
-  ./deploy/remote-install.sh --mode subdomain --domain se-tools.net
-  SSH_KEY=~/.ssh/id_ed25519 ./deploy/remote-install.sh --mode path
-  ./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
+  ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
+  VM_USER=ubuntu VM_HOST=<vm-ip> ./deploy/remote-install.sh --mode path --domain <vm-ip>
+  VM_USER=ubuntu VM_HOST=<vm-ip> ./deploy/remote-install.sh --mode subdomain --domain example.com
 EOF
 }
 
 [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && usage && exit 0
+
+[[ -n "${VM_HOST}" && -n "${VM_USER}" ]] \
+  || die "VM_HOST and VM_USER must be set — export them, or put them in the --config file. See --help."
 
 if [[ -n "${SSH_KEY:-}" ]]; then
   SSH_OPTS+=(-i "${SSH_KEY}")

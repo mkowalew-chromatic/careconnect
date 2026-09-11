@@ -4,7 +4,7 @@ This guide covers installing CareConnect locally for development, deploying to a
 
 > **Read first — two things this guide assumes that a fresh clone doesn't have:**
 >
-> 1. **Per-environment config files.** `deploy/se-tools.net.env` and `deploy/staging.se-tools.net.env` appear throughout the examples but are **gitignored** (they hold environment-specific settings). Create them from [`careconnect.env.example`](careconnect.env.example) before running any command that references them.
+> 1. **Per-environment config files.** Every deploy command takes `--config deploy/<environment>.env` — a file holding that environment's domain, mode, ports, and SSH target. These files are **gitignored** and are never committed, so this guide uses placeholders (`<environment>`, `<vm-ip>`, `<ssh-user>`, `example.com`) rather than real values. Create yours from [`careconnect.env.example`](careconnect.env.example) before running anything below. Keep real hostnames, addresses and usernames out of docs and commit messages.
 > 2. **The CD pipeline is not ported yet.** The artifact-based deploy path (`fetch-ci-artifact.sh`, `deploy-artifact.sh`, and the "already installed" branch of `remote-install.sh`) expects a GitHub Actions workflow named `cd-pipeline.yml` that does not exist in this repo yet. Until it is ported (see [docs/RELEASE.md § Planned automation](../docs/RELEASE.md#planned-automation)), **always pass `--build-from-source` to `remote-install.sh`**; without it the script stops with "No successful CD Pipeline run found". The artifact scripts are documented below so the pipeline can be restored.
 
 ---
@@ -61,7 +61,7 @@ This guide covers installing CareConnect locally for development, deploying to a
 
 ### Remote deploy from laptop
 
-- SSH access to the VM (e.g. `cisco@192.168.11.8`)
+- SSH access to the VM (`<ssh-user>@<vm-ip>`) with sudo rights there
 - `rsync` and `ssh` on your laptop
 - Optional: SSH key — run `./deploy/setup-ssh-key.sh` once
 
@@ -103,7 +103,7 @@ Press `Ctrl+C` to stop all dev servers.
 ### Optional config file
 
 ```bash
-deploy/install.sh --local --config deploy/se-tools.net.env
+deploy/install.sh --local --config deploy/<environment>.env
 ```
 
 The config is sourced for reference; dev servers always use the ports above (Vite defaults).
@@ -131,50 +131,55 @@ These per-app scripts bypass turbo. After editing a design-system component run 
 
 ## Remote Deployment (SSH)
 
-**Recommended** when your Ubuntu VM already exists (e.g. `192.168.11.8`).
+**Recommended** when your Ubuntu VM already exists.
 
 Run from your **laptop**, not on the VM:
 
 ```bash
-./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
+./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 ```
+
+The SSH target (`VM_USER`, `VM_HOST`, optional `VM_PORT`/`SSH_KEY`) is read from the config file, or from the environment, which takes precedence — there are no built-in defaults, and the script refuses to run without them.
 
 ### What happens
 
-1. **SSH test** to `cisco@192.168.11.8` (defaults; override below)
+1. **SSH test** to `<ssh-user>@<vm-ip>`
 2. **Checks** whether CareConnect is already installed on the VM
-3. **`--build-from-source` passed, or not yet installed** (fresh VM): transfers the project over a tar/ssh pipe and runs the full `deploy/install.sh --config deploy/se-tools.net.env` on the VM (builds types + design system + apps from source; several minutes).
+3. **`--build-from-source` passed, or not yet installed** (fresh VM): transfers the project over a tar/ssh pipe and runs the full `deploy/install.sh --config deploy/<environment>.env` on the VM (builds types + design system + apps from source; several minutes).
    **Already installed and no flag:** downloads the latest [CD Pipeline](#artifact-based-deploys-ci) artifact via `deploy/fetch-ci-artifact.sh`, copies it over, and runs `deploy-artifact.sh` on the VM — the same deploy CI would perform, so it can't drift from what CI validated. Requires the `gh` CLI, authenticated (`gh auth login`). **This branch fails today** because `cd-pipeline.yml` has not been ported, which is why every example in this guide passes `--build-from-source`.
 4. Prints summary URLs on your laptop
 
-### Environment variables
+### SSH target variables
+
+Set these in `deploy/<environment>.env` (see the `VM_*` block in `careconnect.env.example`) or export them; exported values win.
 
 | Variable | Default | Description |
 |---|---|---|
-| `VM_USER` | `cisco` | SSH username |
-| `VM_HOST` | `192.168.11.8` | VM IP or hostname |
+| `VM_USER` | (required) | SSH username |
+| `VM_HOST` | (required) | VM IP or hostname |
 | `VM_PORT` | `22` | SSH port |
 | `SSH_KEY` | (none) | Path to private key |
 
 Examples:
 
 ```bash
-# se-tools.net subdomain config
-./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
+# Everything (SSH target + deploy layout) from the config file
+./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 
-# Custom host + key
-VM_USER=cisco VM_HOST=192.168.11.8 SSH_KEY=~/.ssh/id_ed25519 \
-  ./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
+# Override the SSH target / key from the environment
+VM_USER=<ssh-user> VM_HOST=<vm-ip> SSH_KEY=~/.ssh/id_ed25519 \
+  ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 
-# Path mode on VM IP (no DNS)
-./deploy/remote-install.sh --build-from-source --mode path --domain 192.168.11.8
+# Lab VM, path mode on its IP, no config file
+VM_USER=<ssh-user> VM_HOST=<vm-ip> \
+  ./deploy/remote-install.sh --build-from-source --mode path --domain <vm-ip>
 ```
 
 ### SSH key setup (one time)
 
 ```bash
-./deploy/setup-ssh-key.sh
-# or: ssh-copy-id -i ~/.ssh/id_ed25519.pub cisco@192.168.11.8
+VM_USER=<ssh-user> VM_HOST=<vm-ip> ./deploy/setup-ssh-key.sh
+# or: ssh-copy-id -i ~/.ssh/id_ed25519.pub <ssh-user>@<vm-ip>
 ```
 
 ---
@@ -186,7 +191,7 @@ If you are already logged into the Ubuntu VM:
 ```bash
 git clone https://github.com/mkowalew-chromatic/careconnect.git
 cd careconnect
-sudo deploy/install.sh --config deploy/se-tools.net.env
+sudo deploy/install.sh --config deploy/<environment>.env
 ```
 
 Or copy the repo with `rsync`/`scp` and run the same command.
@@ -216,30 +221,30 @@ Configure via `DEPLOY_MODE` in your env file or CLI flags.
 
 Each app gets its own hostname. nginx routes by `server_name`.
 
-**Example:** `deploy/se-tools.net.env`
+With `DOMAIN=example.com`, `PORTAL_HOST=portal`, `EHR_HOST=ehr`:
 
-| App | URL (port 8080 in current config) |
+| App | URL (port from `PORTAL_PORT` / `EHR_PORT`; shown with 80) |
 |---|---|
-| Portal | http://portal.se-tools.net:8080 |
-| EHR | http://ehr.se-tools.net:8080 |
+| Portal | http://portal.example.com |
+| EHR | http://ehr.example.com |
 
-**DNS:** A records for each subdomain → VM IP (e.g. `192.168.11.8`), **or** Cloudflare Tunnel (see below).
+**DNS:** A records for each subdomain → VM IP, **or** a tunnel/reverse proxy in front of the VM (see below).
 
 **Local testing without DNS** — add to `/etc/hosts`:
 
 ```
-192.168.11.8  portal.se-tools.net ehr.se-tools.net
+<vm-ip>  portal.example.com ehr.example.com
 ```
 
-### Cloudflare Tunnel (se-tools.net production)
+### Behind a tunnel or reverse proxy (Cloudflare Tunnel example)
 
-CareConnect on **se-tools.net** is fronted by **Cloudflare** (HTTPS in the browser) and reaches the VM via **cloudflared**. nginx listens on **HTTP port 8080** on the VM; `ENABLE_SSL=false` in `deploy/se-tools.net.env` is correct — TLS terminates at Cloudflare.
+Subdomain mode also works with TLS terminated in front of the VM — for example a Cloudflare Tunnel, or any reverse proxy that forwards to nginx on the VM. In that layout nginx listens on plain HTTP on a non-privileged port (say `8080`, via `PORTAL_PORT`/`EHR_PORT`) and `ENABLE_SSL=false` is correct: the proxy owns the certificate.
 
 ```
-Browser ──HTTPS──► Cloudflare ──tunnel──► cloudflared ──HTTP──► nginx :8080 ──► /api/ ──► Node API :5000
+Browser ──HTTPS──► proxy / tunnel ──HTTP──► nginx :8080 ──► /api/ ──► Node API :5000
 ```
 
-**Ingress rule:** send every CareConnect hostname to the **same** local nginx port. nginx routes by `Host` (`ehr.se-tools.net`, `portal.se-tools.net`, etc.).
+**Ingress rule:** send every CareConnect hostname to the **same** local nginx port. nginx routes by `Host` (`ehr.<domain>`, `portal.<domain>`).
 
 Example `/etc/cloudflared/config.yml`:
 
@@ -248,41 +253,36 @@ tunnel: <your-tunnel-id>
 credentials-file: /etc/cloudflared/<your-tunnel-id>.json
 
 ingress:
-  - hostname: portal.se-tools.net
+  - hostname: portal.example.com
     service: http://127.0.0.1:8080
-  - hostname: ehr.se-tools.net
+  - hostname: ehr.example.com
     service: http://127.0.0.1:8080
   - service: http_status:404
 ```
 
 **Do not:**
 
-- Point `/api/*` at a separate legacy backend (e.g. Python `/api/v1/*`) — staff login will 401 while the CareConnect UI loads.
-- Omit the `Host` header path (use nginx on 8080, not raw `127.0.0.1:5000`), unless you add CORS and static hosting elsewhere.
+- Route `/api/*` (or a whole hostname) to some other backend on the VM — the UI will load but staff login will 401.
+- Point the proxy straight at the API on `127.0.0.1:5000` — go through nginx so the `Host` header, static files and `/api/` prefix are handled.
 
-**Cloudflare dashboard:**
+**Cloudflare dashboard** (if using a Cloudflare Tunnel):
 
-- DNS: each subdomain → CNAME to `<tunnel-id>.cfargotunnel.com` (proxied orange cloud).
+- DNS: each subdomain → CNAME to `<tunnel-id>.cfargotunnel.com` (proxied).
 - SSL/TLS mode: **Full** or **Full (strict)** is fine with cloudflared.
 - Optional: Cache rule — bypass cache for `/api/*`.
 
-**Verify from the VM** (same path the tunnel should use):
+**Verify from the VM** (same path the proxy uses):
 
 ```bash
-curl -s http://127.0.0.1:8080/api/health -H 'Host: ehr.se-tools.net'   # after latest deploy
-curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Host: ehr.se-tools.net' \
+curl -s http://127.0.0.1:8080/api/health -H 'Host: ehr.example.com'
+curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Host: ehr.example.com' \
   -H 'Content-Type: application/json' \
   -d '{"email":"admin@se-tools.net","password":"<seeded demo password>"}'
 ```
 
-**Public URLs** (no `:8080` in the browser when tunnel + DNS are correct):
+**Public URLs** — `https://portal.<domain>` and `https://ehr.<domain>`, with no port in the browser once the proxy and DNS are correct.
 
-| App | URL |
-|-----|-----|
-| Portal | https://portal.se-tools.net |
-| EHR | https://ehr.se-tools.net |
-
-After changing tunnel ingress: `sudo systemctl restart cloudflared` (or your cloudflared unit name).
+After changing tunnel ingress: `sudo systemctl restart cloudflared` (or your proxy's unit name).
 
 
 ### Path mode (`DEPLOY_MODE=path`)
@@ -291,8 +291,8 @@ Single domain/IP, path-based routing:
 
 | App | URL |
 |---|---|
-| Portal | http://192.168.11.8/ |
-| EHR | http://192.168.11.8/ehr/ |
+| Portal | http://\<vm-ip\>/ |
+| EHR | http://\<vm-ip\>/ehr/ |
 
 Best for lab VMs without DNS.
 
@@ -313,7 +313,7 @@ All modes proxy `/api/` → `http://127.0.0.1:5000`.
 
 ### Main config: `/etc/careconnect/careconnect.env`
 
-Copied from your `--config` file on install. Example: `deploy/se-tools.net.env`.
+Copied from your `--config` file (`deploy/<environment>.env`) on install.
 
 | Variable | Description |
 |---|---|
@@ -326,6 +326,7 @@ Copied from your `--config` file on install. Example: `deploy/se-tools.net.env`.
 | `NODE_MAJOR` | Node.js version (default 22) |
 | `INSTALL_DIR` | `/opt/careconnect` |
 | `WWW_ROOT` | `/var/www/careconnect` |
+| `VM_USER`, `VM_HOST`, `VM_PORT`, `SSH_KEY` | SSH target for `remote-install.sh` / `setup-ssh-key.sh` (laptop side only; ignored on the VM) |
 
 See [`careconnect.env.example`](careconnect.env.example) for all options.
 
@@ -378,7 +379,7 @@ sudo /opt/careconnect/deploy/update.sh
 Re-running remote install is safe. With `--build-from-source` it rebuilds on the VM from your local checkout (the artifact path it uses otherwise needs the not-yet-ported CD pipeline):
 
 ```bash
-./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
+./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 ```
 
 ### What updates do **not** reset
@@ -404,19 +405,19 @@ The app is built **once** into a versioned tarball ("artifact") and that same ar
 | Script | Runs on | Purpose |
 |---|---|---|
 | `deploy/fetch-ci-artifact.sh [output-dir]` | Your laptop | Download the latest successful CD Pipeline artifact; requires `gh` authenticated |
-| `deploy/package-artifact.sh [output-dir] [config-file]` | Build machine / CI | Build once, package into a versioned tarball |
+| `deploy/package-artifact.sh [output-dir] <config-file>` | Build machine / CI | Build once, package into a versioned tarball |
 | `deploy/deploy-artifact.sh <artifact-tarball> [config-file]` | Ubuntu VM (as root) | Deploy a built artifact: backup DB, sync code, migrate, publish, restart, health-check |
 | `deploy/rollback.sh <previous-artifact-tarball> <db-backup-path> [config-file]` | Ubuntu VM (as root) | Restore a previous artifact + database backup |
 
 ### `package-artifact.sh`
 
 ```bash
-deploy/package-artifact.sh [output-dir] [config-file]
+deploy/package-artifact.sh [output-dir] <config-file>
 ```
 
 Builds the monorepo once (via `build-production.sh`, which builds the design system into the app bundles) and packages the result into a versioned tarball named `careconnect-<version>-<git-sha>.tar.gz`. The tarball's path is printed as the script's last line of output, so callers can capture it directly (e.g. `ARTIFACT="$(deploy/package-artifact.sh)"`).
 
-Defaults to `deploy/se-tools.net.env` if no config file is given. **Build behavior depends on `DEPLOY_MODE`** — specifically `VITE_EHR_BASE` and `VITE_PORTAL_BASE` are baked into the JS bundles at build time — so the config passed here must match the target environment (e.g. `deploy/staging.se-tools.net.env` for pre-prod). The resulting `MANIFEST.json` inside the artifact records `deployMode`, which `deploy-artifact.sh`/`rollback.sh` verify against the target's own config before deploying.
+The config file is required. **Build behavior depends on `DEPLOY_MODE`** — specifically `VITE_EHR_BASE` and `VITE_PORTAL_BASE` are baked into the JS bundles at build time — so the config passed here must match the target environment (one artifact per environment whose layout differs, e.g. a separate `deploy/<staging>.env`). The resulting `MANIFEST.json` inside the artifact records `deployMode`, which `deploy-artifact.sh`/`rollback.sh` verify against the target's own config before deploying.
 
 ### `deploy-artifact.sh`
 
@@ -479,7 +480,7 @@ curl -s http://127.0.0.1:5000/health
 Requires **subdomain mode** and public DNS pointing to the VM.
 
 ```bash
-sudo deploy/install.sh --config deploy/se-tools.net.env --ssl --email admin@se-tools.net
+sudo deploy/install.sh --config deploy/<environment>.env --ssl --email <you@example.com>
 ```
 
 Or set `ENABLE_SSL="true"` in your env file before install.
@@ -520,7 +521,7 @@ You ran the production installer locally. Use:
 ```bash
 deploy/install.sh --local
 # or
-./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
+./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 ```
 
 ### API health check failed after install
@@ -544,7 +545,7 @@ ls /var/www/careconnect/portal/index.html
 
 ### Staff login fails (401, no error, or silent return)
 
-CareConnect expects **`POST /api/auth/login`** on the **Node.js** API (`service: careconnect-api`). If server logs show **`/api/v1/auth/login`** and **uvicorn**, traffic is hitting a **legacy Python backend** — common when Cloudflare Tunnel ingress still points `/api/*` (or the whole host) at the old service instead of nginx `:8080`.
+CareConnect expects **`POST /api/auth/login`** on the **Node.js** API (`service: careconnect-api`). If the API logs show no login attempt, or a different service answers on port 5000, traffic is reaching **something other than `careconnect-api`** — typically another service that was already bound to port 5000, or a proxy/tunnel ingress that routes `/api/*` (or the whole host) somewhere other than nginx.
 
 **On the VM:**
 
@@ -566,24 +567,24 @@ If `/health` does not include `"careconnect-api"`, stop the conflicting service 
 sudo systemctl restart careconnect-api
 ```
 
-From a browser (via nginx):
+From outside (via nginx / your proxy):
 
 ```bash
-curl -s http://ehr.se-tools.net:8080/api/health
-curl -s -X POST http://ehr.se-tools.net:8080/api/auth/login \
+curl -s http://ehr.example.com/api/health
+curl -s -X POST http://ehr.example.com/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"admin@se-tools.net","password":"<seeded demo password>"}'
 ```
 
 - Default staff password: seeded demo password (ask a teammate)
-- Re-deploy UI after fixes: `./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env`
+- Re-deploy UI after fixes: `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env`
 - If JWT secret changed, log in again (old tokens invalid)
 
 ### Subdomain URLs don't resolve
 
 - Confirm DNS A records or `/etc/hosts` entries
 - Confirm nginx `server_name` matches your hostname
-- Check port (8080 in `se-tools.net.env` vs default 80)
+- Check the port (`PORTAL_PORT`/`EHR_PORT` in your config vs the default 80)
 
 ### `DOMAIN: unbound variable` after remote install
 
@@ -604,8 +605,8 @@ sudo /opt/careconnect/deploy/update.sh
 | Local dev setup | `deploy/install.sh --local` |
 | Start local dev | `./deploy/start-local.sh` |
 | Rebuild design system for dev servers | `npm run ds:build` |
-| Deploy to VM from laptop | `./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env` |
-| Install on VM | `sudo deploy/install.sh --config deploy/se-tools.net.env` |
+| Deploy to VM from laptop | `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env` |
+| Install on VM | `sudo deploy/install.sh --config deploy/<environment>.env` |
 | Update on VM | `sudo /opt/careconnect/deploy/update.sh` |
 | Deploy release tag | `git checkout vX.Y.Z && sudo deploy/update.sh` |
 | Release process | [docs/RELEASE.md](../docs/RELEASE.md) |
@@ -617,14 +618,14 @@ sudo /opt/careconnect/deploy/update.sh
 
 ## Deploy Hints
 
-**Deploy the latest `main` to se-tools.net, from your laptop:**
+**Deploy the latest `main` to an environment, from your laptop:**
 
 ```bash
 git checkout main && git pull
-SSH_KEY=~/.ssh/id_ed25519_singlevm ./deploy/remote-install.sh --build-from-source --config deploy/se-tools.net.env
+./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 ```
 
 - Run from the repo root. `--build-from-source` ships whatever is in your working tree, so pull `main` (or check out the tag you want, `git checkout vX.Y.Z`) first — see [Updates](#updates). It runs `npm ci` and a full turbo build on the VM (several minutes).
-- `SSH_KEY=~/.ssh/id_ed25519_singlevm` is the working key for `cisco@192.168.11.8`; sudo is passwordless on that VM, so no password prompt.
-- `deploy/se-tools.net.env` is gitignored; create it from `careconnect.env.example` on any new laptop.
+- The SSH user, host and key come from the `VM_*` entries in your config file (or the environment). If sudo on the VM needs a password you will be prompted once.
+- `deploy/<environment>.env` is gitignored; create it from `careconnect.env.example` on any new laptop, and never paste its contents into docs, issues, or commit messages.
 - Once `cd-pipeline.yml` is ported, drop `--build-from-source` and authenticate `gh` (`gh auth login`): the script will then deploy the CI-built artifact for your `HEAD` commit in seconds, and refuse if CI/CD hasn't finished for that commit.

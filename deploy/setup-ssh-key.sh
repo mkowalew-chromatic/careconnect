@@ -3,12 +3,12 @@
 # One-time setup: install your SSH public key on the CareConnect VM.
 #
 # Run this in your terminal (password prompt expected once):
-#   ./deploy/setup-ssh-key.sh
+#   VM_USER=ubuntu VM_HOST=<vm-ip> ./deploy/setup-ssh-key.sh
 #
 set -euo pipefail
 
-VM_USER="${VM_USER:-cisco}"
-VM_HOST="${VM_HOST:-192.168.11.8}"
+[[ -n "${VM_HOST:-}" && -n "${VM_USER:-}" ]] \
+  || { echo "ERROR: set VM_USER and VM_HOST, e.g. VM_USER=ubuntu VM_HOST=<vm-ip> $0" >&2; exit 1; }
 KEY="${SSH_KEY:-$HOME/.ssh/id_rsa.pub}"
 
 if [[ ! -f "${KEY}" ]]; then
@@ -29,5 +29,5 @@ ssh -o BatchMode=yes "${VM_USER}@${VM_HOST}" "echo 'SSH key auth works on $(host
 
 echo ""
 echo "Done. You can now run:"
-echo "  ssh careconnect"
-echo "  ./deploy/remote-install.sh"
+echo "  ssh ${VM_USER}@${VM_HOST}"
+echo "  VM_USER=${VM_USER} VM_HOST=${VM_HOST} ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env"

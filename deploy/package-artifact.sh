@@ -9,7 +9,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 OUTPUT_DIR="${1:-${PROJECT_ROOT}/artifacts}"
-CONFIG_FILE="${2:-${SCRIPT_DIR}/se-tools.net.env}"
+CONFIG_FILE="${2:-}"
+if [[ -z "${CONFIG_FILE}" || ! -f "${CONFIG_FILE}" ]]; then
+  echo "usage: deploy/package-artifact.sh [output-dir] <config-file>" >&2
+  echo "The config file selects DEPLOY_MODE (baked into the frontend bundles), so it must be given explicitly." >&2
+  exit 1
+fi
 
 echo "==> Building (via build-production.sh)..."
 bash "${SCRIPT_DIR}/build-production.sh" "${CONFIG_FILE}"

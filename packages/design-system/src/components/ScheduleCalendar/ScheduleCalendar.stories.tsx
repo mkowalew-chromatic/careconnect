@@ -1,11 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ScheduleCalendar, sampleScheduleEvents } from './ScheduleCalendar';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta<typeof ScheduleCalendar> = {
   title: 'Clinical/ScheduleCalendar',
   component: ScheduleCalendar,
   tags: ['autodocs'],
-  parameters: { layout: 'padded' },
+  parameters: { design: figmaDesign('Clinical/ScheduleCalendar'), layout: 'padded' },
 };
 
 export default meta;

@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Alert } from './Alert';
 import { Button } from '../Button';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta<typeof Alert> = { title: 'Components/Alert', component: Alert, tags: ['autodocs'] };
+const meta: Meta<typeof Alert> = { title: 'Components/Alert', parameters: { design: figmaDesign('Components/Alert') }, component: Alert, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj<typeof Alert>;
 

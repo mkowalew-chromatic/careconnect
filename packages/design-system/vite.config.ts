@@ -22,7 +22,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    dts({ include: ['src'], exclude: ['src/**/*.stories.tsx'], rollupTypes: false }),
+    dts({ include: ['src'], exclude: ['src/**/*.stories.tsx', 'src/**/*.test.{ts,tsx}', 'src/figma/**'], rollupTypes: false }),
   ],
   build: {
     lib: {

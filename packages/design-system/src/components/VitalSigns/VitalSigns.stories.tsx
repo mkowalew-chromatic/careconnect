@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { VitalSigns } from './VitalSigns';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta<typeof VitalSigns> = { title: 'Clinical/VitalSigns', component: VitalSigns, tags: ['autodocs'] };
+const meta: Meta<typeof VitalSigns> = { title: 'Clinical/VitalSigns', parameters: { design: figmaDesign('Clinical/VitalSigns') }, component: VitalSigns, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj<typeof VitalSigns>;
 

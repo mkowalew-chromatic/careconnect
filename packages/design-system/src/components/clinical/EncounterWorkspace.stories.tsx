@@ -6,10 +6,11 @@ import { VitalsTrendChart } from '../charts/Charts';
 import { Card, CardContent, CardHeader, CardTitle } from '../Card';
 import { Tabs } from '../Tabs';
 import { EncounterWorkspaceShell } from './EncounterWorkspaceShell';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta = {
   title: 'Clinical/Encounter Workspace',
-  parameters: { layout: 'fullscreen' },
+  parameters: { design: figmaDesign('Clinical/Encounter Workspace'), layout: 'fullscreen' },
 };
 
 export default meta;

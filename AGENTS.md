@@ -19,6 +19,7 @@ Four **release units**, each owned by its own team and released independently �
 | Build | `npm run build` (turbo; builds types + design system before the apps) |
 | Typecheck / tests | `npm run typecheck` (every TS workspace) · `npm test` (API + design system unit tests) · `npm run smoke:test` (Playwright, needs a running stack) |
 | Component library / Storybook | `npm run storybook` → http://localhost:6006 |
+| Figma ↔ Storybook bridge | [docs/FIGMA.md](docs/FIGMA.md) — Figma URLs in `packages/design-system/src/figma/links.json`; after editing `tokens.css` run `npm run tokens:export --workspace=@careconnect/design-system` |
 | Staff login | `admin@se-tools.net` / seeded demo password (ask a teammate) |
 | Billing role login | `billing@se-tools.net` (full access) or `manager@se-tools.net` (view-only) / same seeded password |
 
@@ -49,7 +50,7 @@ See [README.md](README.md), [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md).
 ### Release flow
 
 - CI: `.github/workflows/ci.yml` — one job per unit (`api`, `ehr`, `portal`, `design-system`); `turbo --affected` on PRs so only touched units do real work. Aggregate check **All units passed** is the branch-protection gate.
-- Visual review: `.github/workflows/chromatic.yml` — Storybook on design-system PRs; auto-accepted baseline on `main`.
+- Visual review: `.github/workflows/chromatic.yml` — Storybook on design-system PRs; auto-accepted baseline on `main`. The `main` permalink is also what the Figma plugins (story.to.design, Storybook Connect) read — see [docs/FIGMA.md](docs/FIGMA.md).
 - Release: `.github/workflows/release.yml` on push to `main` — opens/refreshes the **Version Packages** PR while changesets are pending; once it merges, tags every bumped package, creates a GitHub Release per release unit, and dispatches `deploy.yml` per deployable unit.
 - Deploy: `.github/workflows/deploy.yml` — one unit per run, staging → smoke tests → production (environment approval), rollback on smoke failure. Also run by hand for any tag.
 - Manual fallback: `npm run version-packages`, then `npm run release:publish` (tags + GitHub Releases). See [docs/RELEASE.md](docs/RELEASE.md).

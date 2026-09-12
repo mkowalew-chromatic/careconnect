@@ -72,6 +72,22 @@ Actions**:
 | --- | --- | --- |
 | `CHROMATIC_PROJECT_TOKEN` | repository secret | Until it is set, the job skips rather than failing red. |
 
+## Figma
+
+The Figma library is generated from this Storybook and linked back to it —
+see [docs/FIGMA.md](../../docs/FIGMA.md) for the full round trip. What that
+means when you change this package:
+
+- Every `*.stories.tsx` meta carries `parameters: { design: figmaDesign('<title>') }`
+  so the Storybook **Design** tab shows the Figma frame. New stories follow the
+  same pattern; the Figma URLs live in one place,
+  [`src/figma/links.json`](src/figma/links.json), keyed by story title.
+- `src/styles/tokens.css` is exported to [`src/figma/tokens.json`](src/figma/tokens.json)
+  (W3C DTCG) for Figma's variable import. After editing tokens run
+  `npm run tokens:export` — `npm test` fails while the JSON is stale.
+- The `Foundations/Tokens` stories render that JSON, so token changes show up
+  as Chromatic diffs.
+
 ## Node version
 
 The repo root `.nvmrc` (currently Node 24) is the single source of truth: the

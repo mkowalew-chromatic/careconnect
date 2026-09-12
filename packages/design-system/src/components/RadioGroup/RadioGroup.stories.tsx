@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { RadioGroup } from './RadioGroup';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta<typeof RadioGroup> = { title: 'Components/RadioGroup', component: RadioGroup, tags: ['autodocs'] };
+const meta: Meta<typeof RadioGroup> = { title: 'Components/RadioGroup', parameters: { design: figmaDesign('Components/RadioGroup') }, component: RadioGroup, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj<typeof RadioGroup>;
 

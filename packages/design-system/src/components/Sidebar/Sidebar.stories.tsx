@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Sidebar } from './Sidebar';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta<typeof Sidebar> = { title: 'Layout/Sidebar', component: Sidebar, tags: ['autodocs'] };
+const meta: Meta<typeof Sidebar> = { title: 'Layout/Sidebar', parameters: { design: figmaDesign('Layout/Sidebar') }, component: Sidebar, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj<typeof Sidebar>;
 

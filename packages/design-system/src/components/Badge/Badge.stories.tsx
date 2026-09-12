@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Badge } from './Badge';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta<typeof Badge> = {
   title: 'Components/Badge',
+  parameters: { design: figmaDesign('Components/Badge') },
   component: Badge,
   tags: ['autodocs'],
 };

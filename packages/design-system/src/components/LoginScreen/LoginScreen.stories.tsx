@@ -3,12 +3,14 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { LoginScreen } from './LoginScreen';
 import { DESIGN_SYSTEM_VERSION } from '../..';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta<typeof LoginScreen> = {
   title: 'Components/LoginScreen',
   component: LoginScreen,
   tags: ['autodocs'],
   parameters: {
+    design: figmaDesign('Components/LoginScreen'),
     layout: 'fullscreen',
   },
 };

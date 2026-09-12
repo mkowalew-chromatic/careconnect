@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { AppointmentQueueCard, AppointmentRow, sampleAppointments } from './AppointmentRow';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta = { title: 'Clinical/AppointmentQueue', tags: ['autodocs'] };
+const meta: Meta = { title: 'Clinical/AppointmentQueue', parameters: { design: figmaDesign('Clinical/AppointmentQueue') }, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj;
 

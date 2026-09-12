@@ -2,8 +2,9 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from '../Button';
 import { CommandPalette, sampleCommandItems } from './CommandPalette';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta = { title: 'Components/CommandPalette', tags: ['autodocs'] };
+const meta: Meta = { title: 'Components/CommandPalette', parameters: { design: figmaDesign('Components/CommandPalette') }, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj;
 

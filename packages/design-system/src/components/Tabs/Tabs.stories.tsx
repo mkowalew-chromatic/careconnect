@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { TabPanel, Tabs } from './Tabs';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta<typeof Tabs> = {
   title: 'Components/Tabs',
+  parameters: { design: figmaDesign('Components/Tabs') },
   component: Tabs,
   tags: ['autodocs'],
 };

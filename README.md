@@ -302,7 +302,7 @@ CareConnect follows [Semantic Versioning](https://semver.org/) and manages versi
 | `@careconnect/api` | Backend | [apps/api/CHANGELOG.md](apps/api/CHANGELOG.md) | `@careconnect/api@X.Y.Z` | systemd service plus database migrations |
 | `@careconnect/ehr` | EHR frontend | [apps/ehr/CHANGELOG.md](apps/ehr/CHANGELOG.md) | `@careconnect/ehr@X.Y.Z` | Static bundle behind nginx |
 | `@careconnect/portal` | Portal frontend | [apps/portal/CHANGELOG.md](apps/portal/CHANGELOG.md) | `@careconnect/portal@X.Y.Z` | Static bundle behind nginx |
-| `@careconnect/design-system` | Design system | [packages/design-system/CHANGELOG.md](packages/design-system/CHANGELOG.md) | `@careconnect/design-system@X.Y.Z` | Not deployed; the apps consume it at HEAD, and Storybook is published through Chromatic |
+| `@careconnect/design-system` | Design system | [packages/design-system/CHANGELOG.md](packages/design-system/CHANGELOG.md) | `@careconnect/design-system@X.Y.Z` | Not deployed; the apps consume it at HEAD, Storybook is published through Chromatic, and the Figma library is generated from it ([docs/FIGMA.md](docs/FIGMA.md)) |
 
 The shared packages (`types`, `api-client`, `mock-data`) are versioned independently as well, but they ship inside the units that use them, and bumping one automatically patch-bumps its dependents. The root [CHANGELOG.md](CHANGELOG.md) indexes the per-unit changelogs and preserves the pre-monorepo history.
 

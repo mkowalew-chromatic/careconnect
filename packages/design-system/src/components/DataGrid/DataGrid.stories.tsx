@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Badge } from '../Badge';
 import { Button } from '../Button';
 import { DataGrid } from './DataGrid';
+import { figmaDesign } from '../../figma/links';
 
 interface ClaimRow {
   id: string;
@@ -20,6 +21,7 @@ const claims: ClaimRow[] = [
 
 const meta: Meta<typeof DataGrid> = {
   title: 'Components/DataGrid',
+  parameters: { design: figmaDesign('Components/DataGrid') },
   component: DataGrid,
   tags: ['autodocs'],
 };

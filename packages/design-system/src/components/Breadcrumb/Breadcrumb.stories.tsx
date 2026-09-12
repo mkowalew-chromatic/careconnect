@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Breadcrumb } from './Breadcrumb';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta<typeof Breadcrumb> = { title: 'Components/Breadcrumb', component: Breadcrumb, tags: ['autodocs'] };
+const meta: Meta<typeof Breadcrumb> = { title: 'Components/Breadcrumb', parameters: { design: figmaDesign('Components/Breadcrumb') }, component: Breadcrumb, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj<typeof Breadcrumb>;
 

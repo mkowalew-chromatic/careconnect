@@ -62,8 +62,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # No publish-script: every workspace is private, so `changeset publish`
-      # only creates git tags (privatePackages.tag in .changeset/config.json).
+      # Every workspace is private, so the "publish" step is `changeset publish`
+      # in tag-only mode: it creates git tags for untagged versions and pushes
+      # nothing to a registry (privatePackages.tag in .changeset/config.json).
+      # The action skips publishing entirely when publish-script is unset.
       # GitHub Releases are created below for release units only, not for the
       # shared packages that are tagged alongside them.
       - name: Version Packages PR, or tag
@@ -71,6 +73,7 @@ jobs:
         uses: changesets/action@v2
         with:
           version-script: npm run version-packages
+          publish-script: npm run release:tag
           commit-message: 'Version packages'
           pr-title: 'Version packages'
           create-github-releases: false

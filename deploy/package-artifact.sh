@@ -14,8 +14,9 @@
 # Prints the tarball path as the last line of output.
 #
 # Artifact layout (all relative to the tarball root, MANIFEST.json at the top):
-#   api     package.json, package-lock.json, node_modules/ (production only),
-#           apps/api/{package.json,dist/}, packages/types/{package.json,dist/}, deploy/
+#   api     package.json, package-lock.json, node_modules/ (production only,
+#           installed from the lockfile), apps/api/{package.json,dist/},
+#           packages/types/{package.json,dist/}, deploy/
 #   ehr     apps/ehr/dist/, deploy/
 #   portal  apps/portal/dist/, deploy/
 #
@@ -98,9 +99,19 @@ case "${UNIT}" in
     rsync -a "${PROJECT_ROOT}/apps/api/dist/" "${STAGE_DIR}/apps/api/dist/"
     cp "${PROJECT_ROOT}/packages/types/package.json" "${STAGE_DIR}/packages/types/"
     rsync -a "${PROJECT_ROOT}/packages/types/dist/" "${STAGE_DIR}/packages/types/dist/"
-    # Production node_modules (build-production.sh pruned dev deps). Workspace
-    # symlinks (node_modules/@careconnect/*) are relative and survive tar.
-    rsync -a "${PROJECT_ROOT}/node_modules/" "${STAGE_DIR}/node_modules/"
+    # Production node_modules, installed from the lockfile into the staging
+    # dir rather than by pruning the checkout — pruning would strip dev tools
+    # (Playwright for the smoke tests) from the machine doing the packaging.
+    # npm needs every workspace's package.json present to resolve the
+    # lockfile; the resulting node_modules/@careconnect/* symlinks are
+    # relative and survive tar.
+    for manifest in "${PROJECT_ROOT}"/apps/*/package.json "${PROJECT_ROOT}"/packages/*/package.json; do
+      rel="${manifest#"${PROJECT_ROOT}"/}"
+      mkdir -p "${STAGE_DIR}/$(dirname "${rel}")"
+      cp "${manifest}" "${STAGE_DIR}/${rel}"
+    done
+    echo "==> Installing production node_modules into the artifact..."
+    (cd "${STAGE_DIR}" && npm ci --omit=dev --ignore-scripts --no-audit --no-fund)
     ;;
   ehr|portal)
     mkdir -p "${STAGE_DIR}/${PKG_DIR}"

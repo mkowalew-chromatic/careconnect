@@ -33,7 +33,9 @@ function fail(msg) {
 }
 
 function sh(cmd, cmdArgs, opts = {}) {
-  return execFileSync(cmd, cmdArgs, { cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
+  // Returns null (not a string) when stdout is inherited rather than piped.
+  const out = execFileSync(cmd, cmdArgs, { cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts });
+  return out == null ? '' : out.trim();
 }
 
 function tagExists(tag) {

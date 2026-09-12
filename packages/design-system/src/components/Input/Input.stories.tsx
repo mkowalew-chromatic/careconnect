@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Input, Select } from './Input';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta<typeof Input> = {
   title: 'Components/Input',
+  parameters: { design: figmaDesign('Components/Input') },
   component: Input,
   tags: ['autodocs'],
 };

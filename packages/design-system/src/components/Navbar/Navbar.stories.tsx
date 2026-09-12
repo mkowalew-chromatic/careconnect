@@ -2,9 +2,11 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 import { Avatar } from '../Avatar';
 import { CareConnectLogo, Navbar } from './Navbar';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta<typeof Navbar> = {
   title: 'Layout/Navbar',
+  parameters: { design: figmaDesign('Layout/Navbar') },
   component: Navbar,
   tags: ['autodocs'],
 };

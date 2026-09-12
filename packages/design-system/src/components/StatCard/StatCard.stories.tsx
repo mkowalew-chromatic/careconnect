@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { StatCard } from './StatCard';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta<typeof StatCard> = { title: 'Clinical/StatCard', component: StatCard, tags: ['autodocs'] };
+const meta: Meta<typeof StatCard> = { title: 'Clinical/StatCard', parameters: { design: figmaDesign('Clinical/StatCard') }, component: StatCard, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj<typeof StatCard>;
 

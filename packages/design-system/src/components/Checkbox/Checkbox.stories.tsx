@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Checkbox } from './Checkbox';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta<typeof Checkbox> = {
   title: 'Components/Checkbox',
+  parameters: { design: figmaDesign('Components/Checkbox') },
   component: Checkbox,
   tags: ['autodocs'],
 };

@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { FileUpload } from './FileUpload';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta<typeof FileUpload> = { title: 'Components/FileUpload', component: FileUpload, tags: ['autodocs'] };
+const meta: Meta<typeof FileUpload> = { title: 'Components/FileUpload', parameters: { design: figmaDesign('Components/FileUpload') }, component: FileUpload, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj<typeof FileUpload>;
 

@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { PatientBanner } from './PatientBanner';
 import { Button } from '../Button';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta<typeof PatientBanner> = { title: 'Clinical/PatientBanner', component: PatientBanner, tags: ['autodocs'] };
+const meta: Meta<typeof PatientBanner> = { title: 'Clinical/PatientBanner', parameters: { design: figmaDesign('Clinical/PatientBanner') }, component: PatientBanner, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj<typeof PatientBanner>;
 

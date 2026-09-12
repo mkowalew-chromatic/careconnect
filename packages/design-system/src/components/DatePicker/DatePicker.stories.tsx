@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { DatePicker, DateRangePicker } from './DatePicker';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta<typeof DatePicker> = { title: 'Components/DatePicker', component: DatePicker, tags: ['autodocs'] };
+const meta: Meta<typeof DatePicker> = { title: 'Components/DatePicker', parameters: { design: figmaDesign('Components/DatePicker') }, component: DatePicker, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj<typeof DatePicker>;
 

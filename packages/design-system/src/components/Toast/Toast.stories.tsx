@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from '../Button';
 import { ToastProvider, useToast, type ToastVariant } from './Toast';
+import { figmaDesign } from '../../figma/links';
 
 function ToastDemo() {
   const { push } = useToast();
@@ -23,7 +24,7 @@ function ToastTrigger({ variant, message }: { variant: ToastVariant; message: st
   return <Button onClick={() => push(message, variant)}>Show toast</Button>;
 }
 
-const meta: Meta = { title: 'Components/Toast', tags: ['autodocs'], decorators: [(Story) => <ToastProvider><Story /></ToastProvider>] };
+const meta: Meta = { title: 'Components/Toast', parameters: { design: figmaDesign('Components/Toast') }, tags: ['autodocs'], decorators: [(Story) => <ToastProvider><Story /></ToastProvider>] };
 export default meta;
 type Story = StoryObj;
 

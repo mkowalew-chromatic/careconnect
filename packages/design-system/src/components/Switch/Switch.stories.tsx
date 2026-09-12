@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Switch } from './Switch';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta<typeof Switch> = { title: 'Components/Switch', component: Switch, tags: ['autodocs'] };
+const meta: Meta<typeof Switch> = { title: 'Components/Switch', parameters: { design: figmaDesign('Components/Switch') }, component: Switch, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj<typeof Switch>;
 

@@ -7,6 +7,7 @@ const config: StorybookConfig = {
     '@storybook/addon-a11y',
     '@storybook/addon-links',
     '@storybook/addon-themes',
+    '@storybook/addon-designs',
     '@storybook/addon-vitest',
     '@storybook/addon-mcp',
     'storybook-addon-pseudo-states',

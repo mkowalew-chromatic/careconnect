@@ -5,8 +5,9 @@ import { Badge } from '../Badge';
 import { Button } from '../Button';
 import { sampleAppointments } from '../AppointmentRow';
 import { TrackingBoardView } from './TrackingBoardView';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta = { title: 'Clinical/Tracking Board', parameters: { layout: 'padded' } };
+const meta: Meta = { title: 'Clinical/Tracking Board', parameters: { design: figmaDesign('Clinical/Tracking Board'), layout: 'padded' } };
 export default meta;
 type Story = StoryObj;
 

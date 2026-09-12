@@ -13,11 +13,12 @@ import { ChartCard } from './ChartCard';
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 import { chartColors } from './chartTheme';
 import { sparklineData } from './sampleData';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta = {
   title: 'Charts/Clinical Dashboard',
   tags: ['autodocs'],
-  parameters: { layout: 'padded' },
+  parameters: { design: figmaDesign('Charts/Clinical Dashboard'), layout: 'padded' },
 };
 
 export default meta;

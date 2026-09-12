@@ -1,10 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ClinicalRadarChart, LabTrendChart, UtilizationGaugeChart } from './EChartsClinical';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta = {
   title: 'Charts/ECharts Clinical',
   tags: ['autodocs'],
-  parameters: { layout: 'padded' },
+  parameters: { design: figmaDesign('Charts/ECharts Clinical'), layout: 'padded' },
 };
 
 export default meta;

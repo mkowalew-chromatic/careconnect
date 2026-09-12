@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Pagination } from './Pagination';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta<typeof Pagination> = { title: 'Components/Pagination', component: Pagination, tags: ['autodocs'] };
+const meta: Meta<typeof Pagination> = { title: 'Components/Pagination', parameters: { design: figmaDesign('Components/Pagination') }, component: Pagination, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj<typeof Pagination>;
 

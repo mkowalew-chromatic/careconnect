@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Progress } from './Progress';
+import { figmaDesign } from '../../figma/links';
 
-const meta: Meta<typeof Progress> = { title: 'Components/Progress', component: Progress, tags: ['autodocs'] };
+const meta: Meta<typeof Progress> = { title: 'Components/Progress', parameters: { design: figmaDesign('Components/Progress') }, component: Progress, tags: ['autodocs'] };
 export default meta;
 type Story = StoryObj<typeof Progress>;
 

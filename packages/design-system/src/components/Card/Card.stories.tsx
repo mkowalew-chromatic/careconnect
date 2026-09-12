@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Card, CardContent, CardHeader, CardTitle } from './Card';
 import { Badge } from '../Badge';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta<typeof Card> = {
   title: 'Components/Card',
+  parameters: { design: figmaDesign('Components/Card') },
   component: Card,
   tags: ['autodocs'],
 };

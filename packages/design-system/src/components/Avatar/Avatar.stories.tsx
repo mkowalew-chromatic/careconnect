@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Avatar, PatientAvatar } from './Avatar';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta<typeof Avatar> = {
   title: 'Components/Avatar',
+  parameters: { design: figmaDesign('Components/Avatar') },
   component: Avatar,
   tags: ['autodocs'],
 };

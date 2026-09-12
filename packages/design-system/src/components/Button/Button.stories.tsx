@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Button } from './Button';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta<typeof Button> = {
   title: 'Components/Button',
+  parameters: { design: figmaDesign('Components/Button') },
   component: Button,
   tags: ['autodocs'],
   argTypes: {

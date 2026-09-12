@@ -2,9 +2,11 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Badge } from '../Badge';
 import { Button } from '../Button';
 import { EmptyState, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './Table';
+import { figmaDesign } from '../../figma/links';
 
 const meta: Meta<typeof Table> = {
   title: 'Components/Table',
+  parameters: { design: figmaDesign('Components/Table') },
   component: Table,
   tags: ['autodocs'],
 };

@@ -1,8 +1,7 @@
 {
   "name": "careconnect",
-  "version": "1.0.2",
   "private": true,
-  "description": "CareConnect — healthcare EMR demo and its design system (se-tools.net)",
+  "description": "CareConnect — healthcare EMR demo (API, EHR, Portal) and its design system, released as independent units",
   "packageManager": "npm@10.9.3",
   "workspaces": [
     "apps/*",
@@ -26,8 +25,10 @@
     "test:stories": "npm run test:stories --workspace=@careconnect/design-system",
     "smoke:test": "npm run test --workspace=@careconnect/smoke-tests",
     "changeset": "changeset",
-    "version-packages": "changeset version && node scripts/sync-root-version.mjs",
+    "version-packages": "changeset version",
     "release:notes": "changeset status --verbose",
+    "release:tag": "changeset publish",
+    "release:github": "node scripts/github-releases.mjs",
     "release:publish": "bash scripts/release-publish.sh"
   },
   "devDependencies": {

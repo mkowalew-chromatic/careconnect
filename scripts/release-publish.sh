@@ -1,42 +1,28 @@
 #!/usr/bin/env bash
-# Tag and GitHub Release for private monorepo (no npm publish).
+# Manual fallback for the release workflow (.github/workflows/release.yml):
+# tag every workspace at its current version and create GitHub Releases for
+# the release units. Private monorepo — nothing is pushed to a registry.
+#
+# Run on an up-to-date main after `npm run version-packages` has been merged.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-node scripts/sync-root-version.mjs
-
-VERSION=$(node -p "require('./apps/api/package.json').version")
-TAG="v${VERSION}"
-
-if git rev-parse "$TAG" >/dev/null 2>&1; then
-  echo "Tag ${TAG} already exists — skipping."
-  exit 0
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "ERROR: working tree is not clean — commit or stash before tagging." >&2
+  exit 1
 fi
 
-NOTES_FILE=$(mktemp)
-trap 'rm -f "$NOTES_FILE"' EXIT
+echo "==> Creating git tags for any workspace whose version is untagged..."
+npx changeset publish
 
-if grep -q "## \\[${VERSION}\\]" CHANGELOG.md 2>/dev/null; then
-  awk "/^## \\[${VERSION}\\]/,/^## \\[/{ if (/^## \\[/ && !/^## \\[${VERSION}\\]/) exit; print }" CHANGELOG.md >"$NOTES_FILE"
-fi
-
-if [[ ! -s "$NOTES_FILE" && -f apps/api/CHANGELOG.md ]]; then
-  awk "/^## ${VERSION}/,/^## /{ if (/^## / && !/^## ${VERSION}/) exit; print }" apps/api/CHANGELOG.md >"$NOTES_FILE"
-fi
-
-if [[ ! -s "$NOTES_FILE" ]]; then
-  echo "CareConnect ${TAG}" >"$NOTES_FILE"
-fi
-
-git tag -a "$TAG" -m "CareConnect ${TAG}"
-git push origin "$TAG"
+echo "==> Pushing tags..."
+git push origin --tags
 
 if command -v gh >/dev/null 2>&1; then
-  gh release create "$TAG" --title "CareConnect ${TAG}" --notes-file "$NOTES_FILE"
+  echo "==> Creating GitHub Releases for release units..."
+  node scripts/github-releases.mjs "$@"
 else
-  echo "gh CLI not found — tag ${TAG} pushed; create GitHub Release manually."
+  echo "gh CLI not found — tags pushed; create GitHub Releases with: node scripts/github-releases.mjs"
 fi
-
-echo "Released ${TAG}"

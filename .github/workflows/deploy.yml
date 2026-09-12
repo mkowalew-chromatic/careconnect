@@ -1,0 +1,72 @@
+name: Deploy
+
+# Deploys ONE release unit (api, ehr or portal) through staging to production.
+#
+# Dispatched automatically by release.yml for every deployable unit that got a
+# new tag, and by hand (Actions → Deploy → Run workflow) to redeploy any tag or
+# commit — e.g. to re-ship a known-good API after a rollback. Each run is one
+# unit, so the Actions history reads as a per-team deploy log.
+#
+# Flow: build the unit's artifact with the target environment's config →
+# ship it with deploy/remote-deploy.sh → run the Playwright smoke tests →
+# (production only) wait for the environment's required reviewers, then
+# repeat. A failed smoke test rolls that unit back on that environment.
+#
+# Per-environment configuration lives in GitHub Environments "staging" and
+# "production" (see docs/RELEASE.md § One-time setup):
+#   secrets  DEPLOY_CONFIG   contents of the environment's careconnect.env
+#            DEPLOY_SSH_KEY  private key for VM_USER@VM_HOST from that config
+#   vars     DEPLOY_KNOWN_HOSTS  (optional) known_hosts entry for VM_HOST
+#            EHR_URL, PORTAL_URL  public URLs for the smoke tests
+
+run-name: Deploy ${{ inputs.unit }} @ ${{ inputs.ref }} (${{ inputs.environments }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      unit:
+        description: Release unit to deploy
+        type: choice
+        required: true
+        options: [api, ehr, portal]
+      ref:
+        description: 'Tag or commit to deploy (e.g. @careconnect/ehr@1.2.0)'
+        type: string
+        required: true
+      environments:
+        description: Where to deploy
+        type: choice
+        default: staging+production
+        options: [staging+production, staging, production]
+
+# One deploy per unit at a time; deploys of different units run in parallel.
+concurrency:
+  group: deploy-${{ inputs.unit }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  staging:
+    if: inputs.environments != 'production'
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: staging
+      unit: ${{ inputs.unit }}
+      ref: ${{ inputs.ref }}
+    secrets: inherit
+
+  production:
+    needs: staging
+    # Run when staging passed, or was intentionally skipped (environments=production).
+    if: >-
+      always() &&
+      inputs.environments != 'staging' &&
+      (needs.staging.result == 'success' || needs.staging.result == 'skipped')
+    uses: ./.github/workflows/deploy-environment.yml
+    with:
+      environment: production
+      unit: ${{ inputs.unit }}
+      ref: ${{ inputs.ref }}
+    secrets: inherit

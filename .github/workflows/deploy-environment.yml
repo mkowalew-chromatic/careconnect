@@ -1,0 +1,137 @@
+name: Deploy to environment
+
+# Reusable: build one release unit for one environment, deploy it over SSH,
+# smoke-test it, and roll back on failure. Called by deploy.yml — not meant to
+# be run directly.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment name (staging | production)
+        type: string
+        required: true
+      unit:
+        description: Release unit (api | ehr | portal)
+        type: string
+        required: true
+      ref:
+        description: Tag or commit to build and deploy
+        type: string
+        required: true
+
+jobs:
+  deploy:
+    name: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    # Protection rules on the environment (required reviewers, wait timer,
+    # branch/tag restrictions) gate this job — that is the production approval.
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ inputs.unit == 'portal' && vars.PORTAL_URL || vars.EHR_URL }}
+    permissions:
+      contents: read
+    env:
+      DEPLOY_CONFIG_FILE: ${{ github.workspace }}/../careconnect-${{ inputs.environment }}.env
+      SSH_KEY: ${{ github.workspace }}/../deploy_key
+    steps:
+      - name: Check environment configuration
+        env:
+          HAS_CONFIG: ${{ secrets.DEPLOY_CONFIG != '' }}
+          HAS_KEY: ${{ secrets.DEPLOY_SSH_KEY != '' }}
+        run: |
+          if [ "$HAS_CONFIG" != "true" ] || [ "$HAS_KEY" != "true" ]; then
+            echo "::error::Environment '${{ inputs.environment }}' is missing the DEPLOY_CONFIG and/or DEPLOY_SSH_KEY secret — see docs/RELEASE.md § One-time setup."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The config file is kept outside the workspace so it can never end up
+      # inside an artifact. It carries DEPLOY_MODE (baked into frontend
+      # bundles) and the SSH target (VM_USER / VM_HOST / VM_PORT).
+      - name: Write environment config and SSH key
+        env:
+          DEPLOY_CONFIG: ${{ secrets.DEPLOY_CONFIG }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          printf '%s\n' "$DEPLOY_CONFIG" > "$DEPLOY_CONFIG_FILE"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$SSH_KEY"
+          chmod 600 "$SSH_KEY"
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          # shellcheck disable=SC1090
+          source "$DEPLOY_CONFIG_FILE"
+          if [ -n "$DEPLOY_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$DEPLOY_KNOWN_HOSTS" >> ~/.ssh/known_hosts
+          else
+            echo "::warning::DEPLOY_KNOWN_HOSTS is not set for '${{ inputs.environment }}' — trusting the host key on first use (ssh-keyscan)."
+            ssh-keyscan -p "${VM_PORT:-22}" "$VM_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          fi
+
+      - name: Build and package ${{ inputs.unit }}
+        id: package
+        env:
+          SKIP_INSTALL: 'true'
+        run: |
+          artifact=$(bash deploy/package-artifact.sh --unit "${{ inputs.unit }}" --config "$DEPLOY_CONFIG_FILE" --out artifacts | tail -n 1)
+          echo "artifact=${artifact}" >> "$GITHUB_OUTPUT"
+          echo "Built ${artifact}"
+
+      # Stable name per unit + environment so deploy/fetch-ci-artifact.sh can
+      # find "the latest production build of the portal" without knowing run ids.
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: careconnect-${{ inputs.unit }}-${{ inputs.environment }}
+          path: ${{ steps.package.outputs.artifact }}
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Deploy ${{ inputs.unit }} to ${{ inputs.environment }}
+        id: deploy
+        run: bash deploy/remote-deploy.sh --config "$DEPLOY_CONFIG_FILE" "${{ steps.package.outputs.artifact }}"
+
+      - name: Install Playwright browsers
+        if: vars.EHR_URL != '' && vars.PORTAL_URL != ''
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke test
+        id: smoke
+        if: vars.EHR_URL != '' && vars.PORTAL_URL != ''
+        env:
+          EHR_URL: ${{ vars.EHR_URL }}
+          PORTAL_URL: ${{ vars.PORTAL_URL }}
+        run: npm run smoke:test
+
+      - name: Upload smoke test report
+        if: always() && steps.smoke.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-report-${{ inputs.unit }}-${{ inputs.environment }}
+          path: apps/smoke-tests/playwright-report
+          if-no-files-found: ignore
+
+      # Only roll back what this run deployed: a smoke failure after a
+      # successful deploy. A failed deploy already left the VM on the previous
+      # release (api) or never switched the symlink (frontends).
+      - name: Roll back ${{ inputs.unit }} on ${{ inputs.environment }}
+        if: failure() && steps.deploy.outcome == 'success'
+        run: |
+          echo "::error::Smoke tests failed after deploying ${{ inputs.unit }} — rolling back."
+          bash deploy/remote-rollback.sh --config "$DEPLOY_CONFIG_FILE" "${{ inputs.unit }}"
+
+      - name: Remove config and key
+        if: always()
+        run: rm -f "$DEPLOY_CONFIG_FILE" "$SSH_KEY"

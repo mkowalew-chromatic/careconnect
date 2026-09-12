@@ -5,9 +5,9 @@
 
 **CareConnect** is a healthcare EMR demo inspired by [Ottehr](https://github.com/masslight/ottehr), built with a shared component library instead of Material UI. It is designed for demos on **se-tools.net** and can run locally or on a single Ubuntu VM.
 
-The apps and the component library they are built from live together in this monorepo, so a design system change and the app code that consumes it ship in one commit.
+The apps and the component library they are built from live together in this monorepo, so a design system change and the app code that consumes it ship in one commit. Each of the four deliverables — API, EHR, Portal, and the design system — is owned by its own team and **versioned, tagged, released and deployed independently** (see [Versioning & Releases](#versioning--releases)).
 
-**Current version:** 1.0.2 — see [CHANGELOG.md](CHANGELOG.md) and [Release process](docs/RELEASE.md).
+**Current versions:** see the [GitHub Releases](https://github.com/mkowalew-chromatic/careconnect/releases) page (one release per unit, tagged `@careconnect/<unit>@<version>`) or each unit's `CHANGELOG.md`; the release process is in [docs/RELEASE.md](docs/RELEASE.md).
 
 > ⚠️ **Environment config:** deploy commands take a `--config deploy/<environment>.env` file holding that environment's domain, ports, and mode. These files are per-environment secrets and are gitignored — only [`deploy/careconnect.env.example`](deploy/careconnect.env.example) is committed. Copy it to create yours.
 
@@ -220,12 +220,20 @@ careconnect/
 │   ├── types/            # Shared types + questionnaire schemas
 │   ├── api-client/       # API client + WebRTC helper
 │   └── mock-data/        # Legacy static demo data
-├── deploy/               # Install scripts, nginx, systemd
-│   ├── install.sh        # Ubuntu production installer
+├── deploy/               # Install + per-unit deploy scripts, nginx, systemd
+│   ├── install.sh        # Ubuntu production installer (all units, from source)
 │   ├── install-local.sh  # Local dev setup (no sudo)
-│   ├── remote-install.sh # Deploy to VM over SSH
-│   ├── update.sh         # Rebuild + redeploy on VM
+│   ├── remote-install.sh # Fresh install, or redeploy CI artifacts, over SSH
+│   ├── package-artifact.sh / deploy-artifact.sh / rollback.sh   # one unit at a time
+│   ├── update.sh         # Rebuild every unit from source on the VM
 │   └── DEPLOYMENT.md     # Full deployment guide
+├── scripts/
+│   ├── release-units.mjs # The four release units and their owning teams
+│   └── github-releases.mjs
+├── .changeset/           # Pending changesets + config (independent versioning)
+├── .github/
+│   ├── CODEOWNERS        # Per-unit review ownership
+│   └── workflows/        # ci (per unit), release, deploy, chromatic
 ├── package.json
 └── turbo.json
 ```
@@ -254,7 +262,7 @@ import { Button, ToastProvider } from '@careconnect/design-system';
 import '@careconnect/design-system/styles';
 ```
 
-Because npm links the workspace locally, `npm run build` builds the library before the apps that consume it — a component change is picked up without a publish/bump cycle. See [packages/design-system/CONTRIBUTING.md](packages/design-system/CONTRIBUTING.md) for component conventions.
+Because npm links the workspace locally, `npm run build` builds the library before the apps that consume it — the apps always build against the design system at HEAD, so a component change is picked up without a publish/bump cycle, and a change that breaks the EHR or Portal build fails on the design-system PR. The design system still has its own version, changelog, git tag and GitHub Release, cut by the same release flow as the apps. See [packages/design-system/CONTRIBUTING.md](packages/design-system/CONTRIBUTING.md) for component conventions.
 
 ---
 
@@ -268,13 +276,17 @@ CareConnect supports three deployment paths:
 | **Remote SSH** | Deploy from laptop to Ubuntu VM | [DEPLOYMENT.md § Remote](deploy/DEPLOYMENT.md#remote-deployment-ssh) |
 | **On-VM install** | Already SSH'd into Ubuntu | [DEPLOYMENT.md § On-VM](deploy/DEPLOYMENT.md#on-vm-installation) |
 
-**Deploy to a VM from your laptop:**
+Each deployable unit (`api`, `ehr`, `portal`) ships on its own: the **Deploy** workflow builds one unit's artifact, deploys it to staging, smoke-tests it, and promotes it to production — dispatched automatically by the release flow for every unit that got a new version, or by hand for any tag. A portal release never restarts the API.
+
+**From your laptop:**
 
 ```bash
+# First install on a fresh VM (builds every unit from this checkout)
 ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
-```
 
-`--build-from-source` is required until the CD pipeline workflow is ported (see [docs/RELEASE.md](docs/RELEASE.md#planned-automation)); without it the script looks for a CI-built artifact that does not exist yet.
+# Redeploy the latest CI-built artifact of one unit (or all) to an installed VM
+./deploy/remote-install.sh --unit portal --config deploy/<environment>.env
+```
 
 See **[deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md)** for install modes, DNS, SSL, updates, troubleshooting, and file paths.
 
@@ -282,18 +294,20 @@ See **[deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md)** for install modes, DNS, SSL
 
 ## Versioning & Releases
 
-CareConnect uses **Semantic Versioning** and **[Changesets](https://github.com/changesets/changesets)** for changelog and release management.
+CareConnect uses **Semantic Versioning** and **[Changesets](https://github.com/changesets/changesets)**. Four **release units** version, tag, release and deploy independently — one per team:
 
-| Resource | Description |
-|----------|-------------|
-| [apps/api/CHANGELOG.md](apps/api/CHANGELOG.md) | Release history for the app version (written by Changesets) |
-| [packages/design-system/CHANGELOG.md](packages/design-system/CHANGELOG.md) | Design system release history (written by Changesets) |
-| [CHANGELOG.md](CHANGELOG.md) | Index of the above + frozen pre-1.0 history from before the monorepo merge |
-| [docs/RELEASE.md](docs/RELEASE.md) | How to add changesets, cut releases, and deploy tags |
+| Unit | Team | Changelog | Tag / GitHub Release | Deployed as |
+|---|---|---|---|---|
+| `@careconnect/api` | Backend | [apps/api/CHANGELOG.md](apps/api/CHANGELOG.md) | `@careconnect/api@X.Y.Z` | systemd service + DB migrations |
+| `@careconnect/ehr` | EHR frontend | [apps/ehr/CHANGELOG.md](apps/ehr/CHANGELOG.md) | `@careconnect/ehr@X.Y.Z` | static bundle behind nginx |
+| `@careconnect/portal` | Portal frontend | [apps/portal/CHANGELOG.md](apps/portal/CHANGELOG.md) | `@careconnect/portal@X.Y.Z` | static bundle behind nginx |
+| `@careconnect/design-system` | Design system | [packages/design-system/CHANGELOG.md](packages/design-system/CHANGELOG.md) | `@careconnect/design-system@X.Y.Z` | not deployed — consumed at HEAD by the apps; Storybook published via Chromatic |
 
-**Contributors:** after user-facing changes, run `npm run changeset` and commit the generated file with your PR.
+Shared packages (`types`, `api-client`, `mock-data`) version independently too but ship inside the units that use them; a bump to one of them automatically patch-bumps its dependents. [CHANGELOG.md](CHANGELOG.md) indexes the per-unit changelogs and keeps the frozen pre-monorepo history.
 
-**CI:** GitHub Actions (`ci.yml`) typechecks, tests, and builds every workspace on each PR to `main`. Releases are currently cut by hand — `npm run version-packages` then `npm run release:publish` — which tags `vX.Y.Z` and creates the GitHub Release. `@careconnect/design-system` keeps its own version and changelog; every other workspace shares one version (see [docs/RELEASE.md](docs/RELEASE.md)).
+**Contributors:** after a user-facing change, run `npm run changeset`, select only the workspace(s) you changed, and commit the generated file with your PR. Review ownership per unit is in [.github/CODEOWNERS](.github/CODEOWNERS).
+
+**Pipeline:** `ci.yml` runs one job per unit on every PR (only units the PR affects do real work). On merge to `main`, `release.yml` opens or refreshes a **Version Packages** PR; when that merges, it tags each bumped package, creates a GitHub Release per release unit, and dispatches `deploy.yml` for each deployable unit (staging → smoke tests → production, with the production environment's approval rules). Details, one-time GitHub setup, and manual fallbacks: [docs/RELEASE.md](docs/RELEASE.md).
 
 Agent rules: follow [AGENTS.md](AGENTS.md).
 

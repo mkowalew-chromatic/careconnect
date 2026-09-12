@@ -5,8 +5,17 @@ into per-package changelogs. Start here:
 
 | Changelog | Covers |
 |---|---|
-| [apps/api/CHANGELOG.md](apps/api/CHANGELOG.md) | The **CareConnect app version** — `@careconnect/api`, `ehr`, `portal`, `smoke-tests`, `types`, `api-client`, and `mock-data` share one version (a Changesets fixed group). Each `vX.Y.Z` git tag and GitHub Release corresponds to a section here. The other workspaces in the group have their own `CHANGELOG.md` too, but they only record dependency bumps. |
-| [packages/design-system/CHANGELOG.md](packages/design-system/CHANGELOG.md) | `@careconnect/design-system`, which versions independently of the app. |
+| [apps/api/CHANGELOG.md](apps/api/CHANGELOG.md) | `@careconnect/api` — the API service. Tags `@careconnect/api@X.Y.Z`. |
+| [apps/ehr/CHANGELOG.md](apps/ehr/CHANGELOG.md) | `@careconnect/ehr` — the staff EHR frontend. Tags `@careconnect/ehr@X.Y.Z`. |
+| [apps/portal/CHANGELOG.md](apps/portal/CHANGELOG.md) | `@careconnect/portal` — the patient portal frontend. Tags `@careconnect/portal@X.Y.Z`. |
+| [packages/design-system/CHANGELOG.md](packages/design-system/CHANGELOG.md) | `@careconnect/design-system` — the component library. Tags `@careconnect/design-system@X.Y.Z`. |
+| `packages/{types,api-client,mock-data}/CHANGELOG.md` | Shared packages; versioned independently but not released on their own — their bumps show up as dependency updates in the units above. |
+
+Every unit versions independently; each `@careconnect/<name>@X.Y.Z` git tag
+has a matching GitHub Release for the four release units. Before the
+independent-versioning change, `api`, `ehr`, `portal` and the shared packages
+shared one version (`v1.0.0`–`v1.0.2`), which is why their early changelog
+sections move in lockstep.
 
 See [docs/RELEASE.md](docs/RELEASE.md) for how releases are cut.
 

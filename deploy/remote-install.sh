@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 #
-# Install CareConnect on a remote Ubuntu VM over SSH.
+# Install CareConnect on a remote Ubuntu VM over SSH, or redeploy the latest
+# CI-built artifact(s) to one that is already installed.
 #
 # Run from your Mac/laptop (not on the VM):
 #
 #   ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
+#   ./deploy/remote-install.sh --unit portal --config deploy/<environment>.env
 #   VM_USER=ubuntu VM_HOST=<vm-ip> ./deploy/remote-install.sh --mode path --domain <vm-ip>
 #
 # The SSH target comes from VM_USER / VM_HOST / VM_PORT / SSH_KEY, which can be
@@ -23,16 +25,27 @@ REMOTE_DIR="/tmp/careconnect-install"
 # checkout, directly on the VM. Needed for a brand-new VM (nothing to deploy
 # an artifact onto yet) and useful for testing local, not-yet-pushed changes.
 BUILD_FROM_SOURCE=false
+# Artifact-based redeploys are per release unit: --unit api|ehr|portal, or
+# "all" (default) to deploy the latest artifact of every unit, API first.
+DEPLOY_UNIT="all"
+ARTIFACT_ENVIRONMENT="production"
+SHOW_HELP=false
 ARGS=()
-for arg in "$@"; do
-  if [[ "${arg}" == "--build-from-source" ]]; then
-    BUILD_FROM_SOURCE=true
-  else
-    ARGS+=("${arg}")
-  fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) SHOW_HELP=true; shift ;;
+    --build-from-source) BUILD_FROM_SOURCE=true; shift ;;
+    --unit) DEPLOY_UNIT="$2"; shift 2 ;;
+    --environment) ARTIFACT_ENVIRONMENT="$2"; shift 2 ;;
+    *) ARGS+=("$1"); shift ;;
+  esac
 done
+case "${DEPLOY_UNIT}" in
+  api|ehr|portal|all) ;;
+  *) echo "ERROR: --unit must be api, ehr, portal or all" >&2; exit 1 ;;
+esac
 
-INSTALL_ARGS=("${ARGS[@]}")
+INSTALL_ARGS=(${ARGS[@]+"${ARGS[@]}"})
 
 # Resolve deploy settings from CLI args + optional --config file (for local
 # summary), and pick up the SSH target (VM_*) from the config file if it is
@@ -40,9 +53,10 @@ INSTALL_ARGS=("${ARGS[@]}")
 resolve_install_config() {
   DOMAIN=""
   DEPLOY_MODE="path"
+  CONFIG_PATH_RESOLVED=""
   local config_path=""
   local env_vm_user="${VM_USER:-}" env_vm_host="${VM_HOST:-}" env_vm_port="${VM_PORT:-}" env_ssh_key="${SSH_KEY:-}"
-  local args=("${INSTALL_ARGS[@]}")
+  local args=(${INSTALL_ARGS[@]+"${INSTALL_ARGS[@]}"})
   local i=0
   while [[ $i -lt ${#args[@]} ]]; do
     case "${args[$i]}" in
@@ -58,6 +72,7 @@ resolve_install_config() {
     if [[ -f "${cfg}" ]]; then
       # shellcheck disable=SC1090
       source "${cfg}"
+      CONFIG_PATH_RESOLVED="${cfg}"
     fi
   fi
   # Environment beats config file for the SSH target.
@@ -99,13 +114,19 @@ SSH target (required; export in the environment or set in the --config file):
   SSH_KEY   Path to private key (optional)
 
 If CareConnect is already installed on the target VM, this deploys the
-latest CI-built artifact (via deploy/fetch-ci-artifact.sh + deploy-artifact.sh)
--- the same one cd-pipeline.yml ships to preprod/prod -- instead of rebuilding
-from source on the VM. Requires the GitHub CLI (gh), authenticated.
+latest CI-built artifact of each release unit (via deploy/fetch-ci-artifact.sh
++ deploy/remote-deploy.sh) -- the same builds the Deploy workflow ships to
+staging/production -- instead of rebuilding from source on the VM. Requires
+the GitHub CLI (gh), authenticated.
 
-  --build-from-source   Skip the artifact and rebuild from this local
-                         checkout on the VM instead (required for a VM with
-                         no prior install; also useful to test local,
+  --unit U              Which unit to redeploy: api, ehr, portal, or all
+                         (default: all, API first).
+  --environment E       Which environment's CI artifact to fetch: staging or
+                         production (default: production). Frontend bundles
+                         bake in DEPLOY_MODE, so this must match the VM.
+  --build-from-source   Skip the artifacts and rebuild every unit from this
+                         local checkout on the VM instead (required for a VM
+                         with no prior install; also useful to test local,
                          not-yet-pushed changes).
 
 Install options (passed to install.sh; only used for a fresh install, or
@@ -116,12 +137,13 @@ with --build-from-source):
 
 Examples:
   ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
+  ./deploy/remote-install.sh --unit portal --config deploy/<environment>.env
   VM_USER=ubuntu VM_HOST=<vm-ip> ./deploy/remote-install.sh --mode path --domain <vm-ip>
   VM_USER=ubuntu VM_HOST=<vm-ip> ./deploy/remote-install.sh --mode subdomain --domain example.com
 EOF
 }
 
-[[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && usage && exit 0
+[[ "${SHOW_HELP}" == "true" ]] && usage && exit 0
 
 [[ -n "${VM_HOST}" && -n "${VM_USER}" ]] \
   || die "VM_HOST and VM_USER must be set — export them, or put them in the --config file. See --help."
@@ -139,30 +161,35 @@ ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "echo 'SSH OK — $(hostname) running $(lsb
 
 ALREADY_INSTALLED=false
 if ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" \
-    "test -f /etc/careconnect/careconnect.env && test -x /opt/careconnect/deploy/deploy-artifact.sh" 2>/dev/null; then
+    "test -f /etc/careconnect/careconnect.env && test -d /opt/careconnect/deploy" 2>/dev/null; then
   ALREADY_INSTALLED=true
 fi
 
 if [[ "${ALREADY_INSTALLED}" == "true" && "${BUILD_FROM_SOURCE}" != "true" ]]; then
   log "CareConnect is already installed on ${SSH_TARGET} — deploying the latest CI-built"
-  log "artifact (the same one cd-pipeline.yml ships to preprod/prod), not rebuilding on the VM."
+  log "artifact(s) for: ${DEPLOY_UNIT} (${ARTIFACT_ENVIRONMENT}), not rebuilding on the VM."
   log "Use --build-from-source to rebuild in place instead."
 
   command -v gh >/dev/null 2>&1 \
     || die "GitHub CLI (gh) is required for artifact-based deploys: https://cli.github.com — then: gh auth login
 Or pass --build-from-source to rebuild on the VM without gh."
 
-  ARTIFACT_PATH="$("${SCRIPT_DIR}/fetch-ci-artifact.sh")" \
-    || die "Could not fetch a CI-built artifact (see above). To rebuild from source instead, re-run with --build-from-source."
+  if [[ "${DEPLOY_UNIT}" == "all" ]]; then
+    UNITS=(api ehr portal)
+  else
+    UNITS=("${DEPLOY_UNIT}")
+  fi
 
-  log "Copying artifact to ${SSH_TARGET}:/tmp/careconnect-artifact.tar.gz..."
-  scp "${SSH_OPTS[@]}" "${ARTIFACT_PATH}" "${SSH_TARGET}:/tmp/careconnect-artifact.tar.gz" \
-    || die "Failed to copy artifact to ${SSH_TARGET}."
+  CONFIG_ARG=()
+  [[ -n "${CONFIG_PATH_RESOLVED:-}" ]] && CONFIG_ARG=(--config "${CONFIG_PATH_RESOLVED}")
 
-  log "Deploying artifact on VM (sudo password may be prompted)..."
-  ssh -t "${SSH_OPTS[@]}" "${SSH_TARGET}" \
-    "sudo /opt/careconnect/deploy/deploy-artifact.sh /tmp/careconnect-artifact.tar.gz" \
-    || die "Deploy failed on ${SSH_TARGET} — see error output above. sudo deploy/rollback.sh on the VM can recover a bad deploy."
+  for unit in "${UNITS[@]}"; do
+    log "--- ${unit} ---"
+    ARTIFACT_PATH="$("${SCRIPT_DIR}/fetch-ci-artifact.sh" --unit "${unit}" --environment "${ARTIFACT_ENVIRONMENT}")" \
+      || die "Could not fetch a CI-built ${unit} artifact (see above). To rebuild from source instead, re-run with --build-from-source."
+    "${SCRIPT_DIR}/remote-deploy.sh" ${CONFIG_ARG[@]+"${CONFIG_ARG[@]}"} "${ARTIFACT_PATH}" \
+      || die "Deploy of ${unit} failed on ${SSH_TARGET} — see error output above. deploy/remote-rollback.sh ${unit} can recover a bad deploy."
+  done
 else
   if [[ "${BUILD_FROM_SOURCE}" == "true" ]]; then
     log "Rebuilding from source on the VM (--build-from-source)..."

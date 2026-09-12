@@ -23,7 +23,11 @@ on:
 jobs:
   deploy:
     name: ${{ inputs.environment }}
-    runs-on: ubuntu-latest
+    # The VMs sit on a private LAN behind a Cloudflare tunnel, unreachable
+    # from GitHub-hosted runners, so deploys run on a self-hosted runner on
+    # that LAN (deploy/setup-runner.sh). This workflow is only ever started
+    # by workflow_dispatch — never by pull_request — so forks cannot reach it.
+    runs-on: [self-hosted, careconnect-lan]
     # Protection rules on the environment (required reviewers, wait timer,
     # branch/tag restrictions) gate this job — that is the production approval.
     environment:

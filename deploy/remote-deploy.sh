@@ -36,7 +36,7 @@ REMOTE_ARTIFACT="/tmp/$(basename "${ARTIFACT}")"
 
 cc_log "Target: ${SSH_TARGET}"
 cc_log "Copying $(basename "${ARTIFACT}") to ${SSH_TARGET}:${REMOTE_ARTIFACT}..."
-scp "${SSH_OPTS[@]}" "${ARTIFACT}" "${SSH_TARGET}:${REMOTE_ARTIFACT}" \
+scp "${SCP_OPTS[@]}" "${ARTIFACT}" "${SSH_TARGET}:${REMOTE_ARTIFACT}" \
   || cc_die "Failed to copy artifact to ${SSH_TARGET}."
 
 cc_log "Deploying on VM (sudo password may be prompted)..."

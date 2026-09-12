@@ -16,6 +16,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=deploy/lib/common.sh
+source "${SCRIPT_DIR}/lib/common.sh"
 
 # Defaults
 CONFIG_FILE="/etc/careconnect/careconnect.env"
@@ -300,14 +302,17 @@ chown -R "${APP_USER}:${APP_USER}" "${INSTALL_DIR}"
 # here, so npm needs no registry credentials on this VM.
 log "Building production assets..."
 sudo -u "${APP_USER}" env HOME="${INSTALL_DIR}" DEPLOY_MODE="${DEPLOY_MODE}" \
-  bash "${INSTALL_DIR}/deploy/build-production.sh" "${CONFIG_FILE}"
+  bash "${INSTALL_DIR}/deploy/build-production.sh" "${CONFIG_FILE}" all
 
 # --- Publish static files ---
-log "Publishing to ${WWW_ROOT}..."
-mkdir -p "${WWW_ROOT}/portal" "${WWW_ROOT}/ehr"
-rsync -a --delete "${INSTALL_DIR}/apps/portal/dist/" "${WWW_ROOT}/portal/"
-rsync -a --delete "${INSTALL_DIR}/apps/ehr/dist/" "${WWW_ROOT}/ehr/"
-chown -R www-data:www-data "${WWW_ROOT}"
+# Frontends live in ${WWW_ROOT}/releases/<app>/<release-id> behind a symlink,
+# the same layout deploy-artifact.sh uses, so CI deploys and rollbacks of one
+# frontend never touch the other.
+cc_apply_config_defaults
+RELEASE_ID="source-$(git -C "${PROJECT_ROOT}" rev-parse --short HEAD 2>/dev/null || date -u +%Y%m%dT%H%M%SZ)"
+log "Publishing to ${WWW_ROOT} (release ${RELEASE_ID})..."
+cc_publish_frontend portal "${INSTALL_DIR}/apps/portal/dist" "${RELEASE_ID}"
+cc_publish_frontend ehr "${INSTALL_DIR}/apps/ehr/dist" "${RELEASE_ID}"
 
 # --- API environment + systemd (survives reboot) ---
 log "Setting up CareConnect API service..."

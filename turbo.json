@@ -1,5 +1,10 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    "tsconfig.base.json",
+    "scripts/vite-chart-manual-chunks.ts",
+    ".nvmrc"
+  ],
   "tasks": {
     "build": {
       "dependsOn": [

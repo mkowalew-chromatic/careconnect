@@ -2,20 +2,19 @@
   "$schema": "https://unpkg.com/@changesets/config@3.0.0/schema.json",
   "changelog": "@changesets/cli/changelog",
   "commit": false,
-  "fixed": [
-    [
-      "@careconnect/api",
-      "@careconnect/ehr",
-      "@careconnect/portal",
-      "@careconnect/smoke-tests",
-      "@careconnect/types",
-      "@careconnect/api-client",
-      "@careconnect/mock-data"
-    ]
-  ],
+  "fixed": [],
   "linked": [],
   "access": "restricted",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": []
+  "privatePackages": {
+    "version": true,
+    "tag": true
+  },
+  "ignore": [
+    "@careconnect/smoke-tests"
+  ],
+  "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
+    "updateInternalDependents": "always"
+  }
 }

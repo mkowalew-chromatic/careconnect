@@ -3,9 +3,20 @@
 This folder holds [changesets](https://github.com/changesets/changesets) — one
 markdown file per pending, unreleased change.
 
-Add one with `npm run changeset`, commit it alongside your PR, and the release
-flow (`npm run version-packages`, then `npm run release:publish`) turns the
-accumulated changesets into version bumps, CHANGELOG entries, and a tag.
+Add one with `npm run changeset`, pick **only the workspace(s) you changed**,
+and commit it alongside your PR. Every workspace versions independently:
+`@careconnect/api`, `@careconnect/ehr`, `@careconnect/portal` and
+`@careconnect/design-system` are the four release units, each with its own
+version, changelog, git tag and GitHub Release (see
+[docs/RELEASE.md](../docs/RELEASE.md)).
 
-Every workspace here is private, so `changeset version` bumps versions and
-writes changelogs but nothing is published to a registry.
+When a shared package (`types`, `api-client`, `mock-data`, `design-system`)
+bumps, every workspace that depends on it gets a patch bump too
+(`updateInternalDependents: always`) — its built output changed, so its
+version must change. Don't add changesets for dependents by hand.
+
+`@careconnect/smoke-tests` is a test harness, not a release unit, and is
+ignored by Changesets.
+
+Every workspace is private, so `changeset publish` creates git tags
+(`@careconnect/<name>@<version>`) but pushes nothing to a registry.

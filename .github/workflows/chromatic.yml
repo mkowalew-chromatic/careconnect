@@ -1,7 +1,16 @@
 name: Chromatic
 
+# Design-system visual review. Runs on PRs that touch the design system and on
+# main after they merge — the main run auto-accepts, so the baseline every PR
+# is compared against is whatever is on main, not the last manually accepted
+# build.
 on:
   pull_request:
+    paths:
+      - 'packages/design-system/**'
+      - 'package-lock.json'
+  push:
+    branches: [main]
     paths:
       - 'packages/design-system/**'
       - 'package-lock.json'
@@ -12,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     # Chromatic can't run without a project token; skip rather than fail red on
     # forks and on repos where the secret hasn't been set up yet.
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     permissions:
       contents: read
       pull-requests: write
@@ -32,8 +41,10 @@ jobs:
         run: npm ci
 
       # Skip rather than fail red until CHROMATIC_PROJECT_TOKEN is configured
-      # (see CONTRIBUTING.md). secrets.* can't be read in a job-level `if`, so
-      # the token is promoted to env above and tested here.
+      # (see packages/design-system/CONTRIBUTING.md). secrets.* can't be read in
+      # a job-level `if`, so the token is promoted to env above and tested here.
       - name: Publish to Chromatic
         if: env.CHROMATIC_PROJECT_TOKEN != ''
-        run: npx chromatic --exit-zero-on-changes --working-dir packages/design-system
+        run: >
+          npx chromatic --exit-zero-on-changes --working-dir packages/design-system
+          ${{ github.event_name == 'push' && '--auto-accept-changes' || '' }}

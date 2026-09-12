@@ -6,14 +6,16 @@ Human-oriented release details: [docs/RELEASE.md](docs/RELEASE.md).
 
 ## Project
 
-Healthcare EMR demo monorepo: API (Express + SQLite), EHR (includes role-gated Billing section), Portal, and the shared UI component library. UI components live here as the workspace package [`@careconnect/design-system`](packages/design-system) — change a component and its consumers in the same commit; there is no publish step. Deployed as a single unit to Ubuntu VMs on **se-tools.net**.
+Healthcare EMR demo monorepo: API (Express + SQLite), EHR (includes role-gated Billing section), Portal, and the shared UI component library. UI components live here as the workspace package [`@careconnect/design-system`](packages/design-system) — change a component and its consumers in the same commit; there is no publish step.
+
+Four **release units**, each owned by its own team and released independently — `api` (Backend), `ehr` (EHR frontend), `portal` (Portal frontend), `design-system` (Design system); see [scripts/release-units.mjs](scripts/release-units.mjs) and [.github/CODEOWNERS](.github/CODEOWNERS). The three deployable units ship separately to Ubuntu VMs: a portal release never restarts the API.
 
 ## Standard workflows
 
 | Task | Command / doc |
 |------|----------------|
 | Local dev setup | `deploy/install.sh --local` → `./deploy/start-local.sh` |
-| Remote VM deploy | `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env` (see [After a release](#after-a-release-deploy)) |
+| Remote VM deploy | Fresh VM: `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env`. Installed VM: `./deploy/remote-install.sh --unit <api\|ehr\|portal\|all> --config …` ships the latest CI artifact (see [After a release](#after-a-release-deploy)) |
 | Build | `npm run build` (turbo; builds types + design system before the apps) |
 | Typecheck / tests | `npm run typecheck` (every TS workspace) · `npm test` (API + design system unit tests) · `npm run smoke:test` (Playwright, needs a running stack) |
 | Component library / Storybook | `npm run storybook` → http://localhost:6006 |
@@ -24,7 +26,7 @@ See [README.md](README.md), [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md).
 
 ## Versioning & releases (required)
 
-**SemVer** via **Changesets**. The app and shared workspaces (`api`, `ehr`, `portal`, `smoke-tests`, `types`, `api-client`, `mock-data`) form a **fixed** group in [.changeset/config.json](.changeset/config.json) and always share one version — that is the "CareConnect version" (`vX.Y.Z` tags, root `package.json`, README). `@careconnect/design-system` is **not** in the group; it versions independently with its own changelog.
+**SemVer** via **Changesets**, **independent per workspace** ([.changeset/config.json](.changeset/config.json) — no fixed group). Each release unit has its own version, `CHANGELOG.md`, git tag (`@careconnect/<name>@<version>`) and GitHub Release. Shared packages (`types`, `api-client`, `mock-data`) version independently too; when one bumps, its dependents are patch-bumped automatically (`updateInternalDependents: always`). `@careconnect/smoke-tests` is ignored by Changesets.
 
 ### When implementing changes
 
@@ -32,44 +34,54 @@ See [README.md](README.md), [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md).
    ```bash
    npm run changeset
    ```
-   Commit the generated `.changeset/*.md` with the PR. Pick patch / minor / major per [docs/RELEASE.md](docs/RELEASE.md).
+   Select **only the workspace(s) you changed** — never their dependents (a design-system change bumps `ehr`/`portal` on its own). Commit the generated `.changeset/*.md` with the PR. Pick patch / minor / major per [docs/RELEASE.md](docs/RELEASE.md).
 
-2. **Internal-only** (comments, refactors with no behavior change) → no changeset required.
+2. **Internal-only** (comments, refactors with no behavior change, CI) → no changeset required.
 
-3. **Do not** manually bump `version` in `package.json` files — `npm run version-packages` (Changesets) updates every workspace in the fixed group together.
+3. **Do not** manually bump `version` in `package.json` files — `npm run version-packages` (Changesets) does it, one package at a time.
 
-4. **Do not** hardcode version strings in code. API version comes from [apps/api/src/version.ts](apps/api/src/version.ts) reading `apps/api/package.json`.
+4. **Do not** hardcode version strings in code. API version comes from [apps/api/src/version.ts](apps/api/src/version.ts) reading `apps/api/package.json`; the frontends import `version` from their own `package.json`; the design system exports `DESIGN_SYSTEM_VERSION`.
 
-5. **Do not** manually edit the per-package changelogs ([apps/api/CHANGELOG.md](apps/api/CHANGELOG.md), [packages/design-system/CHANGELOG.md](packages/design-system/CHANGELOG.md), etc.) — Changesets writes them. The root [CHANGELOG.md](CHANGELOG.md) is a frozen pre-monorepo archive plus an index; it is not updated per release.
+5. **Do not** manually edit the per-package changelogs — Changesets writes them. The root [CHANGELOG.md](CHANGELOG.md) is a frozen pre-monorepo archive plus an index; it is not updated per release.
+
+6. **Do not** add new deployable apps or libraries without registering them in [scripts/release-units.mjs](scripts/release-units.mjs), [.github/CODEOWNERS](.github/CODEOWNERS), and the `unit` matrix in [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ### Release flow
 
-- CI: `.github/workflows/ci.yml` — `npm ci`, typecheck, test, and build on PRs to `main`
-- Visual review: `.github/workflows/chromatic.yml` — publishes Storybook on design system PRs
-- Release (manual for now): run `npm run version-packages`, then `npm run release:publish` to tag `vX.Y.Z` and cut the GitHub Release. The Version-Packages-PR / auto-merge / CD-pipeline workflows from the pre-merge repos have **not** been ported yet — see [docs/RELEASE.md](docs/RELEASE.md).
+- CI: `.github/workflows/ci.yml` — one job per unit (`api`, `ehr`, `portal`, `design-system`); `turbo --affected` on PRs so only touched units do real work. Aggregate check **All units passed** is the branch-protection gate.
+- Visual review: `.github/workflows/chromatic.yml` — Storybook on design-system PRs; auto-accepted baseline on `main`.
+- Release: `.github/workflows/release.yml` on push to `main` — opens/refreshes the **Version Packages** PR while changesets are pending; once it merges, tags every bumped package, creates a GitHub Release per release unit, and dispatches `deploy.yml` per deployable unit.
+- Deploy: `.github/workflows/deploy.yml` — one unit per run, staging → smoke tests → production (environment approval), rollback on smoke failure. Also run by hand for any tag.
+- Manual fallback: `npm run version-packages`, then `npm run release:publish` (tags + GitHub Releases). See [docs/RELEASE.md](docs/RELEASE.md).
 
 ### After a release (deploy)
 
+Automatic via `deploy.yml`. By hand:
+
 ```bash
-git fetch --tags && git checkout vX.Y.Z
-sudo /opt/careconnect/deploy/update.sh
+gh workflow run deploy.yml -f unit=<api|ehr|portal> -f ref=@careconnect/<unit>@X.Y.Z
+# or from a laptop, latest CI artifact of one unit to an installed VM:
+./deploy/remote-install.sh --unit <unit> --config deploy/<environment>.env
+# or rebuild everything from this checkout on the VM:
+./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 ```
 
-Or from laptop: `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env` (the `--build-from-source` flag is required until `cd-pipeline.yml` is ported; without it the script looks for a CI-built artifact that doesn't exist yet). Environment config files are gitignored — create them from `deploy/careconnect.env.example`, and do not name real hostnames or environments in docs or commit messages.
+Environment config files are gitignored — create them from `deploy/careconnect.env.example`, and do not name real hostnames or environments in docs or commit messages.
 
 ### Checklist before marking work complete
 
 - [ ] Build passes (`npm run build`)
 - [ ] Typecheck and tests pass (`npm run typecheck`, `npm test`) — use the Node version in `.nvmrc`
-- [ ] Changeset added if user-facing
+- [ ] Changeset added if user-facing — for the workspace(s) changed only
 - [ ] No manual version or CHANGELOG edits
 - [ ] API `/health` uses `APP_VERSION` from package.json (no hardcoded version)
+- [ ] Deploy-script changes keep every unit independently deployable (`deploy/package-artifact.sh --unit …` / `deploy-artifact.sh` / `rollback.sh`)
 
 ## Code conventions
 
 - Minimize scope; match existing patterns in surrounding files.
 - Shared types in `@careconnect/types`; API client in `@careconnect/api-client`; UI components in `@careconnect/design-system` (add new components there, not in an app).
-- Private monorepo — no workspace is published to a registry.
+- Private monorepo — no workspace is published to a registry; "publish" means git tag + GitHub Release (+ deploy).
 - The per-app `*:dev` scripts bypass turbo: after changing `@careconnect/types` or the design system, rebuild it (`npm run build --workspace=@careconnect/types` / `npm run ds:build`) before the apps see the change. `deploy/install.sh --local` builds all three once.
 
 ## Commits and pull requests

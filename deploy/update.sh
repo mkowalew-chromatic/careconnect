@@ -1,45 +1,42 @@
 #!/usr/bin/env bash
 #
-# Rebuild and redeploy CareConnect after pulling updates.
+# deploy/update.sh — rebuild every unit from the source in /opt/careconnect and
+# redeploy it in place. For ad-hoc rebuilds on a VM that was installed from
+# source; CI-driven deploys use deploy-artifact.sh, one unit at a time.
+#
+#   sudo deploy/update.sh [config-file]
 #
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=deploy/lib/common.sh
+source "${SCRIPT_DIR}/lib/common.sh"
+
 CONFIG_FILE="${1:-/etc/careconnect/careconnect.env}"
-INSTALL_DIR="/opt/careconnect"
-WWW_ROOT="/var/www/careconnect"
 
-if [[ "$(id -u)" -ne 0 ]]; then
-  echo "ERROR: Run as root: sudo deploy/update.sh" >&2
-  exit 1
-fi
+cc_require_root "$@"
+cc_load_config "${CONFIG_FILE}"
 
-# shellcheck disable=SC1090
-source "${CONFIG_FILE}"
-APP_USER="${APP_USER:-careconnect}"
-
-echo "==> Rebuilding CareConnect..."
+cc_log "Rebuilding CareConnect from ${INSTALL_DIR}..."
 # Every workspace, the design system included, is private and built from source
 # here, so npm needs no registry credentials on this VM.
-sudo -u "${APP_USER}" env HOME="${INSTALL_DIR}" bash "${INSTALL_DIR}/deploy/build-production.sh" "${CONFIG_FILE}"
+sudo -u "${APP_USER}" env HOME="${INSTALL_DIR}" bash "${INSTALL_DIR}/deploy/build-production.sh" "${CONFIG_FILE}" all
 
-echo "==> Publishing static files..."
-mkdir -p "${WWW_ROOT}/portal" "${WWW_ROOT}/ehr"
-rsync -a --delete "${INSTALL_DIR}/apps/portal/dist/" "${WWW_ROOT}/portal/"
-rsync -a --delete "${INSTALL_DIR}/apps/ehr/dist/" "${WWW_ROOT}/ehr/"
-chown -R www-data:www-data "${WWW_ROOT}"
+RELEASE_ID="source-$(git -C "${INSTALL_DIR}" rev-parse --short HEAD 2>/dev/null || date -u +%Y%m%dT%H%M%SZ)"
 
-echo "==> Restarting services..."
+cc_log "Publishing frontends as release ${RELEASE_ID}..."
+cc_publish_frontend portal "${INSTALL_DIR}/apps/portal/dist" "${RELEASE_ID}"
+cc_publish_frontend ehr "${INSTALL_DIR}/apps/ehr/dist" "${RELEASE_ID}"
+
+cc_log "Restarting services..."
 systemctl restart careconnect-api
 systemctl reload nginx
 
-echo "==> Waiting for API health..."
-for i in $(seq 1 30); do
-  if curl -sf http://127.0.0.1:5000/health 2>/dev/null | grep -q '"service"[[:space:]]*:[[:space:]]*"careconnect-api"'; then
-    echo "==> Update complete — API healthy."
-    exit 0
-  fi
-  sleep 1
-done
+cc_log "Waiting for API health..."
+if cc_wait_for_api "${API_PORT}" 30; then
+  cc_log "Update complete — API healthy."
+  exit 0
+fi
 
-echo "WARNING: API health check failed — run: journalctl -u careconnect-api -n 50" >&2
+cc_warn "API health check failed — run: journalctl -u careconnect-api -n 50"
 exit 1

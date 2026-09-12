@@ -1,0 +1,41 @@
+# Code ownership — one owner per release unit.
+#
+# Each release unit (see scripts/release-units.mjs) is owned by its team and
+# reviewed by that team. Shared packages are owned by the team that defines the
+# contract they carry. Later patterns win, so the specific lines below override
+# the catch-all at the top.
+#
+# All areas are currently owned by one person. When the GitHub teams exist,
+# replace the handle on each line with the team, e.g.
+#   apps/api/    @mkowalew-chromatic/backend
+# and keep the rest of the file unchanged.
+
+# Catch-all: repo-wide tooling, root config, docs
+*                                   @martin-chromatic
+
+# --- Backend team: API service and the API contract it publishes -----------
+apps/api/                           @martin-chromatic
+packages/types/                     @martin-chromatic
+packages/api-client/                @martin-chromatic
+packages/mock-data/                 @martin-chromatic
+deploy/systemd/                     @martin-chromatic
+
+# --- EHR frontend team ------------------------------------------------------
+apps/ehr/                           @martin-chromatic
+
+# --- Portal frontend team ---------------------------------------------------
+apps/portal/                        @martin-chromatic
+
+# --- Design system team -----------------------------------------------------
+packages/design-system/             @martin-chromatic
+.github/workflows/chromatic.yml     @martin-chromatic
+
+# --- Platform / release engineering (cross-team; changes here affect everyone)
+.changeset/config.json              @martin-chromatic
+turbo.json                          @martin-chromatic
+package.json                        @martin-chromatic
+package-lock.json                   @martin-chromatic
+scripts/                            @martin-chromatic
+deploy/                             @martin-chromatic
+.github/                            @martin-chromatic
+apps/smoke-tests/                   @martin-chromatic

@@ -9,14 +9,30 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# One job per release unit so each team gets its own required status check
+# ("CI / api", "CI / ehr", "CI / portal", "CI / design-system"). On pull
+# requests, `turbo --affected` limits each job to work that the PR actually
+# touches (directly, or through a shared package such as types or the design
+# system); unaffected jobs finish in seconds and still report green, so the
+# checks can be required unconditionally. Pushes to main run everything.
 jobs:
   verify:
-    name: Typecheck, test, build
+    name: ${{ matrix.unit }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        unit: [api, ehr, portal, design-system]
+    env:
+      # Base for `--affected` on PRs; ignored on pushes to main.
+      TURBO_SCM_BASE: origin/${{ github.base_ref || 'main' }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          # --affected diffs against the base branch, so it needs history.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
@@ -24,24 +40,36 @@ jobs:
           cache: npm
 
       # Every workspace is private and linked locally, so no registry auth is
-      # needed — the design system is built from source rather than installed.
+      # needed — shared packages are built from source as task dependencies.
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
-
-      # Excludes the smoke tests, which need a running stack (see smoke:test).
-      - name: Unit tests
-        run: npm test
-
-      - name: Build all workspaces
-        run: npm run build
+      - name: Typecheck, test, build (${{ matrix.unit }})
+        run: >
+          npx turbo run typecheck test build
+          --filter=@careconnect/${{ matrix.unit }}
+          ${{ github.event_name == 'pull_request' && '--affected' || '' }}
 
       - name: Upload test results
-        if: always()
+        if: always() && matrix.unit == 'design-system'
         uses: actions/upload-artifact@v7
         with:
-          name: junit
+          name: junit-design-system
           path: packages/design-system/test-results/junit.xml
           if-no-files-found: ignore
+
+  # Single aggregate check for branch protection, so the rule doesn't need
+  # updating when units are added or renamed.
+  ci-ok:
+    name: All units passed
+    runs-on: ubuntu-latest
+    needs: verify
+    if: always()
+    steps:
+      - name: Check unit results
+        run: |
+          if [ "${{ needs.verify.result }}" != "success" ]; then
+            echo "One or more unit jobs failed: ${{ needs.verify.result }}"
+            exit 1
+          fi
+          echo "All units passed."

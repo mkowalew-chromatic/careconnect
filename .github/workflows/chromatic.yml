@@ -43,8 +43,18 @@ jobs:
       # Skip rather than fail red until CHROMATIC_PROJECT_TOKEN is configured
       # (see packages/design-system/CONTRIBUTING.md). secrets.* can't be read in
       # a job-level `if`, so the token is promoted to env above and tested here.
+      #
+      # The official action rather than `npx chromatic`: on pull_request events
+      # actions/checkout checks out GitHub's synthetic merge commit, and the bare
+      # CLI then reports the build against that commit instead of the PR head —
+      # so the "UI Tests" / "UI Review" statuses never land on the PR and
+      # Chromatic's PR review stays pending forever. The action forwards the
+      # pull_request head SHA and branch from the event payload.
       - name: Publish to Chromatic
         if: env.CHROMATIC_PROJECT_TOKEN != ''
-        run: >
-          npx chromatic --exit-zero-on-changes --working-dir packages/design-system
-          ${{ github.event_name == 'push' && '--auto-accept-changes' || '' }}
+        uses: chromaui/action@v18
+        with:
+          projectToken: ${{ env.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: packages/design-system
+          exitZeroOnChanges: true
+          autoAcceptChanges: ${{ github.event_name == 'push' }}

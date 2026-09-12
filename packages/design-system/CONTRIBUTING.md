@@ -62,8 +62,11 @@ fallbacks.
 Every PR touching `packages/design-system/**` runs
 [Chromatic](https://www.chromatic.com/) for visual regression review against the
 component Storybook — see [chromatic.yml](../../.github/workflows/chromatic.yml).
-It runs with `--working-dir packages/design-system` so Chromatic builds this
-package's Storybook from the monorepo root.
+It uses the official `chromaui/action` with `workingDir: packages/design-system`
+so Chromatic builds this package's Storybook from the monorepo root and, on
+pull requests, reports the build against the PR's head commit — the bare CLI
+would report the synthetic merge commit and the UI Tests / UI Review statuses
+would never reach the PR.
 
 It needs one repository secret, added under **Settings → Secrets and variables →
 Actions**:

@@ -1,11 +1,11 @@
 # CareConnect Deployment Guide
 
-This guide covers installing CareConnect locally for development, deploying to an Ubuntu VM (directly or over SSH), and applying updates.
+This guide covers running CareConnect locally for development, installing it on an Ubuntu VM (directly or over SSH), and updating a running installation.
 
-> **Read first — two things this guide assumes:**
+> **Two things to know before you start.**
 >
-> 1. **Per-environment config files.** Every deploy command takes `--config deploy/<environment>.env` — a file holding that environment's domain, mode, ports, and SSH target. These files are **gitignored** and are never committed, so this guide uses placeholders (`<environment>`, `<vm-ip>`, `<ssh-user>`, `example.com`) rather than real values. Create yours from [`careconnect.env.example`](careconnect.env.example) before running anything below. Keep real hostnames, addresses and usernames out of docs and commit messages.
-> 2. **Units deploy separately.** The API, EHR and Portal are independent release units with their own versions and artifacts, and the normal way to get a release onto a VM is the **Deploy** GitHub workflow, one unit per run (see [docs/RELEASE.md](../docs/RELEASE.md)). The commands in this guide are the manual equivalents: a fresh VM is installed from source (`--build-from-source`, every unit at once); after that, units are shipped as CI-built artifacts, one at a time.
+> 1. **Every deploy command takes a per-environment config file.** Pass `--config deploy/<environment>.env`, where the file holds that environment's domain, install mode, ports, and SSH target. These files are gitignored and never committed, so this guide uses placeholders (`<environment>`, `<vm-ip>`, `<ssh-user>`, `example.com`) rather than real values. Create yours from [`careconnect.env.example`](careconnect.env.example) before running anything below, and keep real hostnames, addresses, and usernames out of documentation and commit messages.
+> 2. **Units deploy separately.** The API, EHR, and Portal are independent release units with their own versions and build artifacts. The normal way to put a release on a VM is the **Deploy** GitHub workflow, one unit per run (see [docs/RELEASE.md](../docs/RELEASE.md)). The commands in this guide are the manual equivalents: a fresh VM is installed from source with every unit at once (`--build-from-source`); after that, units ship one at a time as CI-built artifacts.
 
 ---
 
@@ -19,10 +19,12 @@ This guide covers installing CareConnect locally for development, deploying to a
 6. [Install Modes & URLs](#install-modes--urls)
 7. [Configuration Reference](#configuration-reference)
 8. [Updates](#updates)
-9. [Service Management](#service-management)
-10. [SSL (Let's Encrypt)](#ssl-lets-encrypt)
-11. [Uninstall](#uninstall)
-12. [Troubleshooting](#troubleshooting)
+9. [Artifact-Based Deploys (CI)](#artifact-based-deploys-ci)
+10. [Service Management](#service-management)
+11. [SSL (Let's Encrypt)](#ssl-lets-encrypt)
+12. [Uninstall](#uninstall)
+13. [Troubleshooting](#troubleshooting)
+14. [Quick Reference](#quick-reference)
 
 ---
 
@@ -30,44 +32,44 @@ This guide covers installing CareConnect locally for development, deploying to a
 
 | Script | Runs on | Requires sudo | Purpose |
 |---|---|---|---|
-| `deploy/install.sh --local` | Your Mac/Linux | No | Dev deps, builds types + design system + API, writes API env + start script |
-| `deploy/remote-install.sh --build-from-source` | Your laptop | No (SSH to VM uses sudo there) | Ships your checkout to the VM and runs the full source install/rebuild there (every unit). Required for a fresh VM. |
-| `deploy/remote-install.sh --unit <api\|ehr\|portal\|all>` | Your laptop | No | Already-installed VM: downloads the latest CI-built artifact of each unit and deploys it (`fetch-ci-artifact.sh` + `remote-deploy.sh`); requires `gh` authenticated |
-| `deploy/remote-deploy.sh <artifact>` · `remote-rollback.sh <unit>` | Your laptop / CI | No | Ship one artifact to a VM and deploy it; roll one unit back |
-| `deploy/install.sh` | Ubuntu VM | **Yes** | Full production install (builds every unit from source) |
+| `deploy/install.sh --local` | Your Mac or Linux machine | No | Installs dev dependencies, builds types, design system, and API, and writes the API env file and start script |
+| `deploy/remote-install.sh --build-from-source` | Your laptop | No (the VM side uses sudo) | Ships your checkout to the VM and runs the full source install or rebuild there for every unit. Required for a fresh VM. |
+| `deploy/remote-install.sh --unit <api\|ehr\|portal\|all>` | Your laptop | No | On an installed VM, downloads the latest CI-built artifact for each unit and deploys it (`fetch-ci-artifact.sh` plus `remote-deploy.sh`). Requires an authenticated `gh` CLI. |
+| `deploy/remote-deploy.sh <artifact>` · `remote-rollback.sh <unit>` | Your laptop or CI | No | Ship one artifact to a VM and deploy it, or roll one unit back |
+| `deploy/install.sh` | Ubuntu VM | **Yes** | Full production install; builds every unit from source |
 | `deploy/update.sh` | Ubuntu VM | **Yes** | Rebuild every unit from source and redeploy in place |
-| `deploy/deploy-artifact.sh <artifact>` · `rollback.sh <unit>` | Ubuntu VM | **Yes** | Deploy / roll back one unit (used by CI and by the remote-* wrappers) |
+| `deploy/deploy-artifact.sh <artifact>` · `rollback.sh <unit>` | Ubuntu VM | **Yes** | Deploy or roll back one unit; used by CI and by the `remote-*` wrappers |
 | `deploy/uninstall.sh` | Ubuntu VM | **Yes** | Remove CareConnect |
 
-**Important:** Do not run `sudo deploy/install.sh` on macOS — it uses `apt-get`, nginx, and systemd, which are Linux-only. On macOS use `--local` or `remote-install.sh`.
+Do not run `sudo deploy/install.sh` on macOS. It uses `apt-get`, nginx, and systemd, none of which exist there. On macOS, use `--local` or `remote-install.sh`.
 
-**Release units:** the API, EHR and Portal are deployed **independently** — each has its own version, artifact (`careconnect-<unit>-<version>-<sha>.tar.gz`) and deploy run, so shipping a portal fix never restarts the API. On the VM: the API lives in `/opt/careconnect` behind systemd; each frontend lives in `${WWW_ROOT}/releases/<app>/<release-id>` behind a symlink (`${WWW_ROOT}/ehr`, `${WWW_ROOT}/portal`) that nginx serves, so a frontend deploy is an atomic symlink swap and a rollback is the swap in reverse.
+**Release units.** The API, EHR, and Portal deploy independently. Each has its own version, its own artifact (`careconnect-<unit>-<version>-<sha>.tar.gz`), and its own deploy run, so shipping a portal fix never restarts the API. On the VM, the API lives in `/opt/careconnect` behind systemd. Each frontend lives in `${WWW_ROOT}/releases/<app>/<release-id>` behind a symlink (`${WWW_ROOT}/ehr`, `${WWW_ROOT}/portal`) that nginx serves, so a frontend deploy is an atomic symlink swap and a rollback is the same swap in reverse.
 
-**Component library:** the shared UI components (Button, Card, Table, Navbar, …) live in this repo at `packages/design-system`. `build-production.sh` builds it before the frontends (turbo orders it via `dependsOn`), and Vite inlines it into each app bundle — there is no separate library artifact to deploy, and no registry credentials are needed to install.
+**Component library.** The shared UI components live in this repository at `packages/design-system`. `build-production.sh` builds the library before the frontends (Turborepo orders this through `dependsOn`), and Vite inlines it into each app bundle. There is no separate library artifact to deploy and no registry credentials to configure.
 
 ---
 
 ## Prerequisites
 
-### Local development (Mac/Linux)
+### Local development (Mac or Linux)
 
-- Node.js **24** — the version in the repo's [`.nvmrc`](../.nvmrc) (`nvm use`); CI uses the same file. Older than 22.22 fails the design-system tests.
-- npm 10+
+- Node.js **24**, the version in the repository's [`.nvmrc`](../.nvmrc) (`nvm use`). CI uses the same file. Versions older than 22.22 fail the design-system tests.
+- npm 10 or later
 - `openssl` (usually preinstalled)
 
-### Production VM (Ubuntu 22.04+ recommended)
+### Production VM (Ubuntu 22.04 or later recommended)
 
-- Ubuntu or Debian with `apt-get` (the installer adds Node.js `NODE_MAJOR`, default 22 — enough to build and run; the stricter Node 24 above is only for the local test toolchain)
-- Root/sudo access
-- **2 GB+ RAM** recommended for `npm ci` + builds
-- Open ports: HTTP (80 or custom, e.g. 8080), API internal (5000, localhost only)
-- Optional: DNS A records for subdomain mode
+- Ubuntu or Debian with `apt-get`. The installer adds Node.js `NODE_MAJOR` (default 22), which is enough to build and run; the Node 24 requirement above applies only to the local test toolchain.
+- Root or sudo access
+- At least 2 GB of RAM for `npm ci` and the builds
+- Open ports: HTTP on 80 or a custom port such as 8080; the API listens on 5000 on localhost only
+- DNS A records, if you plan to use subdomain mode
 
-### Remote deploy from laptop
+### Remote deployment from a laptop
 
-- SSH access to the VM (`<ssh-user>@<vm-ip>`) with sudo rights there
+- SSH access to the VM as `<ssh-user>@<vm-ip>`, with sudo rights on the VM
 - `rsync` and `ssh` on your laptop
-- Optional: SSH key — run `./deploy/setup-ssh-key.sh` once
+- Optionally, an SSH key installed on the VM; run `./deploy/setup-ssh-key.sh` once
 
 ---
 
@@ -80,12 +82,12 @@ cd careconnect
 deploy/install.sh --local
 ```
 
-This will:
+The installer:
 
-1. Run `npm ci --include=dev`
-2. Build `@careconnect/types`, `@careconnect/design-system`, and the API (the EHR and Portal dev servers import the design system's `dist/`, so it must exist before they start)
-3. Write `deploy/runtime/careconnect-api.env` (JWT secret, DB path)
-4. Create `deploy/start-local.sh`
+1. Runs `npm ci --include=dev`.
+2. Builds `@careconnect/types`, `@careconnect/design-system`, and the API. The EHR and Portal dev servers import the design system's `dist/`, so it must exist before they start.
+3. Writes `deploy/runtime/careconnect-api.env` with a JWT secret and database path.
+4. Creates `deploy/start-local.sh`.
 
 ### Start all services
 
@@ -99,8 +101,7 @@ This will:
 | EHR | http://localhost:4000 |
 | Portal | http://localhost:4001 |
 
-**Staff login:** `admin@se-tools.net` / seeded demo password (ask a teammate)
-**Billing role (within EHR):** `billing@se-tools.net` for full access, or `manager@se-tools.net` for view-only — same seeded password
+Sign in to the EHR as `admin@se-tools.net` with the seeded demo password (ask a teammate). For the Billing section, use `billing@se-tools.net` for full access or `manager@se-tools.net` for read-only access; both share the same password.
 
 Press `Ctrl+C` to stop all dev servers.
 
@@ -110,9 +111,9 @@ Press `Ctrl+C` to stop all dev servers.
 deploy/install.sh --local --config deploy/<environment>.env
 ```
 
-The config is sourced for reference; dev servers always use the ports above (Vite defaults).
+The config file is sourced for reference only. The dev servers always use the Vite default ports listed above.
 
-### Manual start (individual terminals)
+### Manual start (one terminal per service)
 
 ```bash
 set -a && source deploy/runtime/careconnect-api.env && set +a
@@ -121,60 +122,59 @@ npm run ehr:dev
 npm run portal:dev
 ```
 
-These per-app scripts bypass turbo. After editing a design-system component run `npm run ds:build` (or iterate in `npm run storybook`); after editing `@careconnect/types` run `npm run build --workspace=@careconnect/types`.
+These per-app scripts bypass Turborepo. After editing a design-system component, run `npm run ds:build` (or iterate in `npm run storybook`); after editing `@careconnect/types`, run `npm run build --workspace=@careconnect/types`.
 
 ### Local paths
 
 | Item | Path |
 |---|---|
-| SQLite DB | `./data/careconnect.db` |
-| API env | `deploy/runtime/careconnect-api.env` |
-| JWT secret | Stored in API env file (gitignored) |
+| SQLite database | `./data/careconnect.db` |
+| API env file | `deploy/runtime/careconnect-api.env` |
+| JWT secret | Stored in the API env file, which is gitignored |
 
 ---
 
 ## Remote Deployment (SSH)
 
-**Recommended** when your Ubuntu VM already exists.
-
-Run from your **laptop**, not on the VM:
+This is the recommended path when the Ubuntu VM already exists. Run it from your laptop, not on the VM:
 
 ```bash
 ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 ```
 
-The SSH target (`VM_USER`, `VM_HOST`, optional `VM_PORT`/`SSH_KEY`) is read from the config file, or from the environment, which takes precedence — there are no built-in defaults, and the script refuses to run without them.
+The SSH target (`VM_USER`, `VM_HOST`, and optionally `VM_PORT` and `SSH_KEY`) is read from the config file or from the environment; environment values take precedence. There are no built-in defaults, and the script refuses to run without a target.
 
-### What happens
+### What the script does
 
-1. **SSH test** to `<ssh-user>@<vm-ip>`
-2. **Checks** whether CareConnect is already installed on the VM
-3. **`--build-from-source` passed, or not yet installed** (fresh VM): transfers the project over a tar/ssh pipe and runs the full `deploy/install.sh --config deploy/<environment>.env` on the VM (builds types + design system + every app from source; several minutes).
-   **Already installed and no flag:** for each unit selected by `--unit` (default `all`: api, ehr, portal), downloads the latest artifact the Deploy workflow built for that unit and environment via `deploy/fetch-ci-artifact.sh`, and ships it with `deploy/remote-deploy.sh` → `deploy-artifact.sh` on the VM — the same deploy CI performs, so it can't drift from what CI validated. Requires the `gh` CLI, authenticated (`gh auth login`). See [Artifact-Based Deploys](#artifact-based-deploys-ci).
-4. Prints summary URLs on your laptop
+1. Tests the SSH connection to `<ssh-user>@<vm-ip>`.
+2. Checks whether CareConnect is already installed on the VM.
+3. Chooses one of two paths:
+   - **With `--build-from-source`, or when CareConnect is not yet installed:** transfers the project over a tar-and-ssh pipe and runs the full `deploy/install.sh --config deploy/<environment>.env` on the VM. This builds types, the design system, and every app from source and takes several minutes.
+   - **Already installed, no flag:** for each unit selected by `--unit` (default `all`: api, ehr, portal), downloads the latest artifact the Deploy workflow built for that unit and environment using `deploy/fetch-ci-artifact.sh`, then ships it with `deploy/remote-deploy.sh`, which runs `deploy-artifact.sh` on the VM. This is the same deploy CI performs, so it cannot drift from what CI validated. It requires the `gh` CLI, authenticated with `gh auth login`. See [Artifact-Based Deploys](#artifact-based-deploys-ci).
+4. Prints the resulting URLs.
 
 ### SSH target variables
 
-Set these in `deploy/<environment>.env` (see the `VM_*` block in `careconnect.env.example`) or export them; exported values win.
+Set these in `deploy/<environment>.env` (see the `VM_*` block in `careconnect.env.example`) or export them in your shell. Exported values win.
 
 | Variable | Default | Description |
 |---|---|---|
 | `VM_USER` | (required) | SSH username |
-| `VM_HOST` | (required) | VM IP or hostname |
+| `VM_HOST` | (required) | VM IP address or hostname |
 | `VM_PORT` | `22` | SSH port |
-| `SSH_KEY` | (none) | Path to private key |
+| `SSH_KEY` | (none) | Path to a private key |
 
 Examples:
 
 ```bash
-# Everything (SSH target + deploy layout) from the config file
+# Everything (SSH target and deploy layout) from the config file
 ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 
-# Override the SSH target / key from the environment
+# Override the SSH target and key from the environment
 VM_USER=<ssh-user> VM_HOST=<vm-ip> SSH_KEY=~/.ssh/id_ed25519 \
   ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 
-# Lab VM, path mode on its IP, no config file
+# Lab VM in path mode on its IP address, with no config file
 VM_USER=<ssh-user> VM_HOST=<vm-ip> \
   ./deploy/remote-install.sh --build-from-source --mode path --domain <vm-ip>
 ```
@@ -190,7 +190,7 @@ VM_USER=<ssh-user> VM_HOST=<vm-ip> ./deploy/setup-ssh-key.sh
 
 ## On-VM Installation
 
-If you are already logged into the Ubuntu VM:
+If you are already logged in to the Ubuntu VM:
 
 ```bash
 git clone https://github.com/mkowalew-chromatic/careconnect.git
@@ -198,43 +198,41 @@ cd careconnect
 sudo deploy/install.sh --config deploy/<environment>.env
 ```
 
-Or copy the repo with `rsync`/`scp` and run the same command.
+Alternatively, copy the repository to the VM with `rsync` or `scp` and run the same command.
 
 ### What the production installer does
 
-1. Installs Node.js 22, nginx, curl, openssl, rsync, ufw
-2. Creates system user `careconnect`
-3. Syncs app to `/opt/careconnect`
-4. Runs `npm ci` and `npm run build` (turbo builds `@careconnect/types` and the design system first, then API, EHR, Portal), then prunes dev dependencies
-5. Publishes each frontend to `/var/www/careconnect/releases/{portal,ehr}/<release-id>` and points the `/var/www/careconnect/{portal,ehr}` symlinks (what nginx serves) at them
-6. Writes `/etc/careconnect/careconnect.env` and `careconnect-api.env`
-7. Enables and starts **systemd** services: `careconnect-api`, `nginx`
-8. Configures nginx + firewall
-9. Waits for API health check (`GET /health`)
-10. Optionally runs Let's Encrypt (`--ssl`)
+1. Installs Node.js 22, nginx, curl, openssl, rsync, and ufw.
+2. Creates the `careconnect` system user.
+3. Syncs the application to `/opt/careconnect`.
+4. Runs `npm ci` and `npm run build`. Turborepo builds `@careconnect/types` and the design system first, then the API, EHR, and Portal. Dev dependencies are pruned afterwards.
+5. Publishes each frontend to `/var/www/careconnect/releases/{portal,ehr}/<release-id>` and points the `/var/www/careconnect/{portal,ehr}` symlinks, which nginx serves, at them.
+6. Writes `/etc/careconnect/careconnect.env` and `careconnect-api.env`.
+7. Enables and starts the `careconnect-api` and `nginx` systemd services.
+8. Configures nginx and the firewall.
+9. Waits for the API health check (`GET /health`) to pass.
+10. Runs Let's Encrypt if `--ssl` was given.
 
-Services are **enabled on boot** — they survive VM reboot.
+Both services are enabled at boot and survive a VM restart.
 
 ---
 
 ## Install Modes & URLs
 
-Configure via `DEPLOY_MODE` in your env file or CLI flags.
+Set `DEPLOY_MODE` in your env file or pass the equivalent CLI flags.
 
 ### Subdomain mode (`DEPLOY_MODE=subdomain`)
 
-Each app gets its own hostname. nginx routes by `server_name`.
-
-With `DOMAIN=example.com`, `PORTAL_HOST=portal`, `EHR_HOST=ehr`:
+Each app gets its own hostname, and nginx routes by `server_name`. With `DOMAIN=example.com`, `PORTAL_HOST=portal`, and `EHR_HOST=ehr`:
 
 | App | URL (port from `PORTAL_PORT` / `EHR_PORT`; shown with 80) |
 |---|---|
 | Portal | http://portal.example.com |
 | EHR | http://ehr.example.com |
 
-**DNS:** A records for each subdomain → VM IP, **or** a tunnel/reverse proxy in front of the VM (see below).
+For DNS, create an A record for each subdomain pointing at the VM, or place a tunnel or reverse proxy in front of the VM (see below).
 
-**Local testing without DNS** — add to `/etc/hosts`:
+To test locally without DNS, add an entry to `/etc/hosts`:
 
 ```
 <vm-ip>  portal.example.com ehr.example.com
@@ -242,13 +240,13 @@ With `DOMAIN=example.com`, `PORTAL_HOST=portal`, `EHR_HOST=ehr`:
 
 ### Behind a tunnel or reverse proxy (Cloudflare Tunnel example)
 
-Subdomain mode also works with TLS terminated in front of the VM — for example a Cloudflare Tunnel, or any reverse proxy that forwards to nginx on the VM. In that layout nginx listens on plain HTTP on a non-privileged port (say `8080`, via `PORTAL_PORT`/`EHR_PORT`) and `ENABLE_SSL=false` is correct: the proxy owns the certificate.
+Subdomain mode also works when TLS terminates in front of the VM, whether through a Cloudflare Tunnel or any reverse proxy that forwards to nginx. In that layout nginx listens on plain HTTP on an unprivileged port (say `8080`, set via `PORTAL_PORT` and `EHR_PORT`), and `ENABLE_SSL=false` is correct because the proxy owns the certificate.
 
 ```
 Browser ──HTTPS──► proxy / tunnel ──HTTP──► nginx :8080 ──► /api/ ──► Node API :5000
 ```
 
-**Ingress rule:** send every CareConnect hostname to the **same** local nginx port. nginx routes by `Host` (`ehr.<domain>`, `portal.<domain>`).
+Send every CareConnect hostname to the same local nginx port. nginx routes by the `Host` header (`ehr.<domain>`, `portal.<domain>`).
 
 Example `/etc/cloudflared/config.yml`:
 
@@ -264,18 +262,18 @@ ingress:
   - service: http_status:404
 ```
 
-**Do not:**
+Two configurations to avoid:
 
-- Route `/api/*` (or a whole hostname) to some other backend on the VM — the UI will load but staff login will 401.
-- Point the proxy straight at the API on `127.0.0.1:5000` — go through nginx so the `Host` header, static files and `/api/` prefix are handled.
+- Routing `/api/*` (or an entire hostname) to some other backend on the VM. The UI loads, but staff login returns 401.
+- Pointing the proxy directly at the API on `127.0.0.1:5000`. Go through nginx so that the `Host` header, static files, and the `/api/` prefix are handled correctly.
 
-**Cloudflare dashboard** (if using a Cloudflare Tunnel):
+If you use a Cloudflare Tunnel, in the Cloudflare dashboard:
 
-- DNS: each subdomain → CNAME to `<tunnel-id>.cfargotunnel.com` (proxied).
-- SSL/TLS mode: **Full** or **Full (strict)** is fine with cloudflared.
-- Optional: Cache rule — bypass cache for `/api/*`.
+- DNS: point each subdomain at `<tunnel-id>.cfargotunnel.com` with a proxied CNAME.
+- SSL/TLS mode: **Full** or **Full (strict)** both work with cloudflared.
+- Optionally, add a cache rule that bypasses the cache for `/api/*`.
 
-**Verify from the VM** (same path the proxy uses):
+Verify from the VM, using the same path the proxy takes:
 
 ```bash
 curl -s http://127.0.0.1:8080/api/health -H 'Host: ehr.example.com'
@@ -284,32 +282,29 @@ curl -s -X POST http://127.0.0.1:8080/api/auth/login -H 'Host: ehr.example.com' 
   -d '{"email":"admin@se-tools.net","password":"<seeded demo password>"}'
 ```
 
-**Public URLs** — `https://portal.<domain>` and `https://ehr.<domain>`, with no port in the browser once the proxy and DNS are correct.
+Once the proxy and DNS are correct, the public URLs are `https://portal.<domain>` and `https://ehr.<domain>`, with no port in the browser.
 
-After changing tunnel ingress: `sudo systemctl restart cloudflared` (or your proxy's unit name).
-
+After changing tunnel ingress rules, run `sudo systemctl restart cloudflared` (or restart your proxy's unit).
 
 ### Path mode (`DEPLOY_MODE=path`)
 
-Single domain/IP, path-based routing:
+A single domain or IP address with path-based routing. Best for lab VMs without DNS.
 
 | App | URL |
 |---|---|
 | Portal | http://\<vm-ip\>/ |
 | EHR | http://\<vm-ip\>/ehr/ |
 
-Best for lab VMs without DNS.
-
 ### Ports mode (`DEPLOY_MODE=ports`)
 
-Each app on a separate port (legacy):
+Each app on its own port. This mode is legacy.
 
 | App | Default port |
 |---|---|
 | Portal | 8080 |
 | EHR | 8081 |
 
-All modes proxy `/api/` → `http://127.0.0.1:5000`.
+In every mode, nginx proxies `/api/` to `http://127.0.0.1:5000`.
 
 ---
 
@@ -317,23 +312,23 @@ All modes proxy `/api/` → `http://127.0.0.1:5000`.
 
 ### Main config: `/etc/careconnect/careconnect.env`
 
-Copied from your `--config` file (`deploy/<environment>.env`) on install.
+Copied from your `--config` file (`deploy/<environment>.env`) at install time.
 
 | Variable | Description |
 |---|---|
-| `DOMAIN` | Primary domain or VM IP |
-| `DEPLOY_MODE` | `path` \| `subdomain` \| `ports` |
+| `DOMAIN` | Primary domain or VM IP address |
+| `DEPLOY_MODE` | `path`, `subdomain`, or `ports` |
 | `PORTAL_HOST`, `EHR_HOST` | Subdomain prefixes |
 | `PORTAL_PORT`, `EHR_PORT`, … | HTTP listen ports |
-| `ENABLE_SSL` | `true` to run certbot (subdomain mode) |
+| `ENABLE_SSL` | `true` to run certbot (subdomain mode only) |
 | `SSL_EMAIL` | Let's Encrypt contact email |
-| `NODE_MAJOR` | Node.js version (default 22) |
+| `NODE_MAJOR` | Node.js major version to install (default 22) |
 | `INSTALL_DIR` | `/opt/careconnect` |
-| `WWW_ROOT` | `/var/www/careconnect` (frontends served from `${WWW_ROOT}/{ehr,portal}` symlinks into `${WWW_ROOT}/releases/`) |
-| `RELEASE_RETENTION` | How many past releases/artifacts/backups to keep per unit for rollback (default 5) |
-| `VM_USER`, `VM_HOST`, `VM_PORT`, `SSH_KEY` | SSH target for `remote-install.sh` / `setup-ssh-key.sh` (laptop side only; ignored on the VM) |
+| `WWW_ROOT` | `/var/www/careconnect`. Frontends are served from the `${WWW_ROOT}/{ehr,portal}` symlinks into `${WWW_ROOT}/releases/` |
+| `RELEASE_RETENTION` | How many past releases, artifacts, and backups to keep per unit for rollback (default 5) |
+| `VM_USER`, `VM_HOST`, `VM_PORT`, `SSH_KEY` | SSH target for `remote-install.sh` and `setup-ssh-key.sh`; used on the laptop only and ignored on the VM |
 
-See [`careconnect.env.example`](careconnect.env.example) for all options.
+See [`careconnect.env.example`](careconnect.env.example) for the full list.
 
 ### API runtime: `/etc/careconnect/careconnect-api.env`
 
@@ -341,42 +336,42 @@ See [`careconnect.env.example`](careconnect.env.example) for all options.
 |---|---|
 | `PORT` | API listen port (5000) |
 | `CARECONNECT_DATA_DIR` | SQLite directory (`/var/lib/careconnect`) |
-| `JWT_SECRET` | Auto-generated on first install |
+| `JWT_SECRET` | Generated automatically on first install |
 | `NODE_ENV` | `production` |
 
-**Do not commit this file.** Rotate `JWT_SECRET` if compromised (invalidates existing staff sessions).
+Never commit this file. If `JWT_SECRET` is compromised, rotate it; doing so invalidates all existing staff sessions.
 
 ---
 
 ## Updates
 
-Releases are deployed automatically, one unit at a time, by the **Deploy**
-workflow ([docs/RELEASE.md](../docs/RELEASE.md)). The commands below are for
-doing the same by hand, or for VMs that CI does not reach.
+Releases are deployed automatically, one unit at a time, by the **Deploy** workflow described in [docs/RELEASE.md](../docs/RELEASE.md). The commands below do the same thing by hand, and are also the way to update VMs that CI cannot reach.
 
 ### Deploy a release of one unit (recommended)
 
-From **Actions → Deploy → Run workflow**, or:
+From **Actions → Deploy → Run workflow**, or from the command line:
 
 ```bash
 gh workflow run deploy.yml -f unit=portal -f ref=@careconnect/portal@1.3.0
 ```
 
-From your laptop, to ship the latest CI-built artifact of a unit (or every
-unit, API first) to an installed VM:
+To ship the latest CI-built artifact of one unit, or of every unit with the API first, from your laptop to an installed VM:
 
 ```bash
+git fetch --tags && git checkout @careconnect/portal@1.3.0
 ./deploy/remote-install.sh --unit portal --config deploy/<environment>.env
 ./deploy/remote-install.sh --unit all    --config deploy/<environment>.env
 ```
 
-`fetch-ci-artifact.sh` refuses an artifact built from a commit other than
-your local `HEAD` unless `ALLOW_STALE=true`, so check out the tag you mean
-to deploy first (`git fetch --tags && git checkout @careconnect/portal@1.3.0`).
+A few details:
+
+- The script needs an authenticated `gh` CLI (`gh auth login`). It downloads the newest artifact the Deploy workflow built for that unit and environment (`--environment staging|production`, default `production`) and deploys it in seconds.
+- `fetch-ci-artifact.sh` refuses an artifact built from a commit other than your local `HEAD`, which is why the example checks out the tag first. Set `ALLOW_STALE=true` to override.
+- `--unit all` deploys the API, then the EHR, then the Portal.
 
 ### Rebuild every unit from source on the VM
 
-For VMs installed from source, or to try local, not-yet-pushed changes:
+Use this for VMs that were installed from source, or to try local changes that have not been pushed yet:
 
 ```bash
 # On the VM
@@ -387,37 +382,36 @@ sudo /opt/careconnect/deploy/update.sh
 ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 ```
 
-`update.sh` runs `deploy/build-production.sh … all` (npm ci, turbo build of
-every workspace, prune dev deps), publishes both frontends as a new
-`source-<sha>` release, restarts `careconnect-api`, reloads nginx and checks
-API health.
+`update.sh` runs `deploy/build-production.sh … all` (`npm ci`, a Turborepo build of every workspace, and a prune of dev dependencies), publishes both frontends as a new `source-<sha>` release, restarts `careconnect-api`, reloads nginx, and checks API health. The laptop variant ships whatever is in your working tree and does the same on the VM, which takes several minutes. It is required for a fresh VM; otherwise prefer the artifact path so the VM runs exactly what CI validated.
 
-### What updates do **not** reset
+If sudo on the VM requires a password, you are prompted once. The CI deploy user needs passwordless sudo.
 
-- SQLite data in `/var/lib/careconnect` (patients, appointments, etc.)
-- `JWT_SECRET` in `careconnect-api.env` (preserved unless you delete it)
-- `/etc/careconnect/careconnect.env` (updated from your config file on reinstall)
+### What updates preserve
+
+- SQLite data in `/var/lib/careconnect` (patients, appointments, and so on)
+- `JWT_SECRET` in `careconnect-api.env`, unless you delete it
+- `/etc/careconnect/careconnect.env`, which is refreshed from your config file on reinstall
 
 ### Database migrations
 
-Schema changes run automatically on API startup via `migrateModules()` in the API. No separate migration command is required for local/manual deployments (`update.sh`, `remote-install.sh --build-from-source`, `install.sh`).
+Schema changes run automatically when the API starts, through `migrateModules()`. Local and manual deployments (`update.sh`, `remote-install.sh --build-from-source`, `install.sh`) need no separate migration step.
 
-The artifact deploy path (`deploy-artifact.sh`, below) additionally runs migrations as an explicit, abortable pre-flight step *before* the service restarts, rather than relying on boot-time migration alone. This is the path staging and production deploys use.
+The artifact deploy path (`deploy-artifact.sh`, below) additionally runs migrations as an explicit, abortable pre-flight step before the service restarts, rather than relying on boot-time migration alone. This is the path staging and production deploys use.
 
 ---
 
 ## Artifact-Based Deploys (CI)
 
-Each unit is built **once** into a versioned tarball ("artifact") and that same artifact is shipped, unchanged, to the target VM — rather than rebuilding from source there. This is how the Deploy workflow deploys to staging and production, and also what `remote-install.sh --unit …` deploys to an already-installed VM — so a human-triggered redeploy and the automated pipeline cannot disagree about what is actually running.
+Each unit is built once into a versioned tarball, the artifact, and that same artifact is shipped unchanged to the target VM rather than rebuilt from source there. The Deploy workflow uses this path for staging and production, and `remote-install.sh --unit …` uses it for an already-installed VM, so a hand-triggered redeploy and the automated pipeline cannot disagree about what is running.
 
 | Script | Runs on | Purpose |
 |---|---|---|
-| `deploy/package-artifact.sh --unit <u> [--config <file>] [--out <dir>]` | Build machine / CI | Build one unit, package it into `careconnect-<unit>-<version>-<sha>.tar.gz` |
-| `deploy/remote-deploy.sh [--config <file>] <artifact>` | Your laptop / CI | Copy an artifact to the VM and run `deploy-artifact.sh` there |
-| `deploy/remote-rollback.sh [--config <file>] <unit> [...]` | Your laptop / CI | Run `rollback.sh` on the VM |
-| `deploy/fetch-ci-artifact.sh --unit <u> [--environment <e>]` | Your laptop | Download the latest artifact the Deploy workflow built for that unit + environment; requires `gh` authenticated |
-| `deploy/deploy-artifact.sh <artifact> [config-file]` | Ubuntu VM (as root) | Deploy one artifact (reads its unit from `MANIFEST.json`) |
-| `deploy/rollback.sh <unit> [...] [--config <file>]` | Ubuntu VM (as root) | Roll one unit back to its previous release |
+| `deploy/package-artifact.sh --unit <u> [--config <file>] [--out <dir>]` | Build machine or CI | Build one unit and package it as `careconnect-<unit>-<version>-<sha>.tar.gz` |
+| `deploy/remote-deploy.sh [--config <file>] <artifact>` | Your laptop or CI | Copy an artifact to the VM and run `deploy-artifact.sh` there |
+| `deploy/remote-rollback.sh [--config <file>] <unit> [...]` | Your laptop or CI | Run `rollback.sh` on the VM |
+| `deploy/fetch-ci-artifact.sh --unit <u> [--environment <e>]` | Your laptop | Download the latest artifact the Deploy workflow built for that unit and environment; requires an authenticated `gh` |
+| `deploy/deploy-artifact.sh <artifact> [config-file]` | Ubuntu VM, as root | Deploy one artifact; reads its unit from `MANIFEST.json` |
+| `deploy/rollback.sh <unit> [...] [--config <file>]` | Ubuntu VM, as root | Roll one unit back to its previous release |
 
 ### `package-artifact.sh`
 
@@ -426,18 +420,16 @@ deploy/package-artifact.sh --unit api
 deploy/package-artifact.sh --unit ehr --config deploy/<environment>.env
 ```
 
-Builds one unit (via `build-production.sh <config> <unit>`, which builds its workspace dependencies first) and packages it. The tarball's path is printed as the last line of output, so callers can capture it directly.
+Builds one unit through `build-production.sh <config> <unit>`, which builds the unit's workspace dependencies first, then packages it. The tarball's path is the last line of output, so callers can capture it directly.
 
-Artifact contents:
-
-| Unit | Contents |
+| Unit | Artifact contents |
 |---|---|
-| `api` | `apps/api/{package.json,dist/}`, `packages/types/{package.json,dist/}`, root `package.json` + lockfile, production `node_modules/`, `deploy/` |
-| `ehr` / `portal` | `apps/<unit>/dist/`, `deploy/` |
+| `api` | `apps/api/{package.json,dist/}`, `packages/types/{package.json,dist/}`, the root `package.json` and lockfile, production `node_modules/`, and `deploy/` |
+| `ehr` / `portal` | `apps/<unit>/dist/` and `deploy/` |
 
-Every artifact carries `deploy/` (scripts only — never `*.env`) so the VM runs the deploy scripts that match the artifact.
+Every artifact carries `deploy/` (scripts only, never `*.env` files) so the VM runs the deploy scripts that match the artifact.
 
-For the frontends the config file is required: **`DEPLOY_MODE` is baked into the JS bundle** (`VITE_EHR_BASE` / `VITE_PORTAL_BASE`), so an artifact built with one layout must not be deployed to an environment using another. `MANIFEST.json` records `deployMode`, and `deploy-artifact.sh` refuses a mismatch. The API does not bake anything and needs no config to build; CI still builds it per environment for a uniform pipeline.
+The config file is required for the frontends because `DEPLOY_MODE` is baked into the JavaScript bundle (`VITE_EHR_BASE` and `VITE_PORTAL_BASE`). An artifact built for one layout must not be deployed to an environment using another; `MANIFEST.json` records `deployMode`, and `deploy-artifact.sh` refuses a mismatch. The API bakes nothing in and needs no config to build, though CI still builds it per environment to keep the pipeline uniform.
 
 ### `deploy-artifact.sh`
 
@@ -445,25 +437,25 @@ For the frontends the config file is required: **`DEPLOY_MODE` is baked into the
 sudo deploy/deploy-artifact.sh <artifact-tarball> [config-file]
 ```
 
-Reads the unit from the manifest and:
+Reads the unit from the manifest and then:
 
-- **api** — stops `careconnect-api`, backs up the database, syncs only the API's paths into `/opt/careconnect` (`apps/api`, `packages/types`, `node_modules`, root manifests — nothing else is touched), runs migrations, starts the service, health-checks, prunes old backups. If migrations fail, the pre-deploy backup is restored and **`careconnect-api` is left stopped** to avoid crash-looping on the still-broken new code — `sudo deploy/rollback.sh api` recovers.
-- **ehr / portal** — copies the bundle to `${WWW_ROOT}/releases/<app>/<version>-<sha>/`, atomically re-points `${WWW_ROOT}/<app>` at it, reloads nginx. The previous release is kept; older ones are pruned to `RELEASE_RETENTION` (default 5).
+- **api:** stops `careconnect-api`, backs up the database, syncs only the API's paths into `/opt/careconnect` (`apps/api`, `packages/types`, `node_modules`, and the root manifests; nothing else is touched), runs migrations, starts the service, health-checks it, and prunes old backups. If migrations fail, the pre-deploy backup is restored and `careconnect-api` is left stopped so it does not crash-loop on the broken code. `sudo deploy/rollback.sh api` recovers from this state.
+- **ehr / portal:** copies the bundle to `${WWW_ROOT}/releases/<app>/<version>-<sha>/`, atomically re-points `${WWW_ROOT}/<app>` at it, and reloads nginx. The previous release is kept, and older ones are pruned down to `RELEASE_RETENTION` (default 5).
 
-Each deploy records what it did in `${CARECONNECT_DATA_DIR}/artifacts/<unit>/current` (artifact kept alongside, the previous artifact, the pre-deploy DB backup for the API), which is what makes argument-less rollback possible.
+Each deploy records what it did in `${CARECONNECT_DATA_DIR}/artifacts/<unit>/current`, keeping the artifact, the previous artifact, and (for the API) the pre-deploy database backup alongside. That record is what makes argument-free rollback possible.
 
 ### `rollback.sh`
 
 ```bash
-sudo deploy/rollback.sh api                                   # previous artifact + the DB backup taken before it was replaced
+sudo deploy/rollback.sh api                                   # previous artifact plus the DB backup taken before it was replaced
 sudo deploy/rollback.sh api <artifact-tarball> <db-backup>    # explicit
-sudo deploy/rollback.sh ehr                                   # previous release dir
+sudo deploy/rollback.sh ehr                                   # previous release directory
 sudo deploy/rollback.sh portal <release-id>                   # any kept release (ls ${WWW_ROOT}/releases/portal)
 ```
 
-**api:** takes a fresh backup of the *current* database first (so a rollback is itself reversible), restores the given backup, syncs the previous artifact's code, restarts and health-checks. No migrations are re-run — the restored backup already matches the restored code's schema.
+For the **API**, rollback first takes a fresh backup of the current database, so the rollback is itself reversible, then restores the given backup, syncs the previous artifact's code, restarts the service, and health-checks it. Migrations are not re-run: the restored backup already matches the restored code's schema.
 
-**ehr / portal:** a symlink swap plus an nginx reload — instant, no rebuild.
+For the **EHR and Portal**, rollback is a symlink swap and an nginx reload. It is instant and involves no rebuild.
 
 The Deploy workflow runs the same rollback automatically when the smoke tests fail after a deploy.
 
@@ -475,7 +467,7 @@ The Deploy workflow runs the same rollback automatically when the smoke tests fa
 # Status
 systemctl status careconnect-api nginx
 
-# Logs (live)
+# Live logs
 journalctl -u careconnect-api -f
 journalctl -u nginx -f
 
@@ -483,7 +475,7 @@ journalctl -u nginx -f
 sudo systemctl restart careconnect-api
 sudo systemctl reload nginx
 
-# Confirm enabled on boot
+# Confirm both are enabled at boot
 systemctl is-enabled careconnect-api nginx
 ```
 
@@ -491,12 +483,12 @@ systemctl is-enabled careconnect-api nginx
 
 ```bash
 curl http://127.0.0.1:5000/health
-# {"status":"ok","service":"careconnect-api","version":"1.0.2"}   ← version = apps/api/package.json
+# {"status":"ok","service":"careconnect-api","version":"1.0.2"}   # version comes from apps/api/package.json
 ```
 
-### After VM reboot
+### After a VM reboot
 
-Both services should start automatically. Verify with:
+Both services start automatically. To confirm:
 
 ```bash
 systemctl status careconnect-api nginx
@@ -507,18 +499,15 @@ curl -s http://127.0.0.1:5000/health
 
 ## SSL (Let's Encrypt)
 
-Requires **subdomain mode** and public DNS pointing to the VM.
+Requires subdomain mode and public DNS pointing at the VM.
 
 ```bash
 sudo deploy/install.sh --config deploy/<environment>.env --ssl --email <you@example.com>
 ```
 
-Or set `ENABLE_SSL="true"` in your env file before install.
+Alternatively, set `ENABLE_SSL="true"` in your env file before installing.
 
-Certbot requests certificates for:
-
-- `portal.{DOMAIN}`
-- `ehr.{DOMAIN}`
+Certbot requests certificates for `portal.{DOMAIN}` and `ehr.{DOMAIN}`.
 
 ---
 
@@ -530,23 +519,23 @@ On the VM:
 sudo /opt/careconnect/deploy/uninstall.sh
 ```
 
-Removes:
+This removes:
 
 - `/opt/careconnect`
 - `/var/www/careconnect`
 - `/etc/careconnect`
-- `/var/lib/careconnect` (including database)
-- `careconnect-api` systemd unit
+- `/var/lib/careconnect`, including the database
+- the `careconnect-api` systemd unit
 
-nginx remains installed; default site is restored.
+nginx stays installed, and its default site is restored.
 
 ---
 
 ## Troubleshooting
 
-### `apt-get: command not found` on Mac
+### `apt-get: command not found` on a Mac
 
-You ran the production installer locally. Use:
+You ran the production installer locally. Use one of these instead:
 
 ```bash
 deploy/install.sh --local
@@ -554,7 +543,7 @@ deploy/install.sh --local
 ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 ```
 
-### API health check failed after install
+### API health check fails after install
 
 ```bash
 journalctl -u careconnect-api -n 80 --no-pager
@@ -562,23 +551,23 @@ ls -la /opt/careconnect/apps/api/dist/
 ls -la /var/lib/careconnect/
 ```
 
-Common causes: Node version mismatch, build failure, permission on data dir.
+The usual causes are a Node version mismatch, a failed build, or permissions on the data directory.
 
-### nginx 502 / blank page
+### nginx returns 502 or a blank page
 
 ```bash
 sudo nginx -t
 systemctl status nginx
 curl http://127.0.0.1:5000/health
-ls -l /var/www/careconnect/portal          # symlink → releases/portal/<release-id>
+ls -l /var/www/careconnect/portal          # symlink to releases/portal/<release-id>
 ls /var/www/careconnect/portal/index.html
 ```
 
-### Staff login fails (401, no error, or silent return)
+### Staff login fails (401, no error, or a silent return)
 
-CareConnect expects **`POST /api/auth/login`** on the **Node.js** API (`service: careconnect-api`). If the API logs show no login attempt, or a different service answers on port 5000, traffic is reaching **something other than `careconnect-api`** — typically another service that was already bound to port 5000, or a proxy/tunnel ingress that routes `/api/*` (or the whole host) somewhere other than nginx.
+CareConnect expects `POST /api/auth/login` to reach the Node.js API (`careconnect-api`). If the API logs show no login attempt, or a different service answers on port 5000, traffic is reaching something other than `careconnect-api`. This is usually another service that was already bound to port 5000, or a proxy or tunnel ingress that routes `/api/*` (or the whole host) somewhere other than nginx.
 
-**On the VM:**
+On the VM:
 
 ```bash
 # Must return: {"status":"ok","service":"careconnect-api",...}
@@ -598,7 +587,7 @@ If `/health` does not include `"careconnect-api"`, stop the conflicting service 
 sudo systemctl restart careconnect-api
 ```
 
-From outside (via nginx / your proxy):
+From outside, through nginx or your proxy:
 
 ```bash
 curl -s http://ehr.example.com/api/health
@@ -607,21 +596,23 @@ curl -s -X POST http://ehr.example.com/api/auth/login \
   -d '{"email":"admin@se-tools.net","password":"<seeded demo password>"}'
 ```
 
-- Default staff password: seeded demo password (ask a teammate)
-- Re-deploy UI after fixes: `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env`
-- If JWT secret changed, log in again (old tokens invalid)
+Also worth knowing:
 
-### Subdomain URLs don't resolve
+- The default staff password is the seeded demo password; ask a teammate.
+- After fixing the routing, redeploy the UI with `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env`.
+- If the JWT secret changed, existing tokens are invalid; sign in again.
 
-- Confirm DNS A records or `/etc/hosts` entries
-- Confirm nginx `server_name` matches your hostname
-- Check the port (`PORTAL_PORT`/`EHR_PORT` in your config vs the default 80)
+### Subdomain URLs do not resolve
 
-### `DOMAIN: unbound variable` after remote install
+- Confirm the DNS A records or `/etc/hosts` entries.
+- Confirm the nginx `server_name` matches your hostname.
+- Check the port: `PORTAL_PORT` and `EHR_PORT` in your config versus the default 80.
 
-Fixed in current `remote-install.sh`. Update your local repo and re-run if needed; the VM install itself was still successful.
+### `DOMAIN: unbound variable` after a remote install
 
-### Rebuild only (no full reinstall)
+This was a bug in an older `remote-install.sh`. Update your local checkout and re-run if needed; the VM install itself succeeded.
+
+### Rebuild without a full reinstall
 
 ```bash
 sudo /opt/careconnect/deploy/update.sh
@@ -635,38 +626,14 @@ sudo /opt/careconnect/deploy/update.sh
 |---|---|
 | Local dev setup | `deploy/install.sh --local` |
 | Start local dev | `./deploy/start-local.sh` |
-| Rebuild design system for dev servers | `npm run ds:build` |
-| Fresh install on VM from laptop | `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env` |
+| Rebuild the design system for the dev servers | `npm run ds:build` |
+| Fresh install on a VM from your laptop | `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env` |
 | Redeploy one unit's CI artifact | `./deploy/remote-install.sh --unit portal --config deploy/<environment>.env` |
-| Deploy a release (CI) | `gh workflow run deploy.yml -f unit=<unit> -f ref=@careconnect/<unit>@X.Y.Z` |
-| Roll one unit back | `sudo /opt/careconnect/deploy/rollback.sh <unit>` (on VM) · `./deploy/remote-rollback.sh --config … <unit>` (laptop) |
-| Install on VM | `sudo deploy/install.sh --config deploy/<environment>.env` |
-| Rebuild everything on VM | `sudo /opt/careconnect/deploy/update.sh` |
+| Deploy a release through CI | `gh workflow run deploy.yml -f unit=<unit> -f ref=@careconnect/<unit>@X.Y.Z` |
+| Roll one unit back | `sudo /opt/careconnect/deploy/rollback.sh <unit>` on the VM, or `./deploy/remote-rollback.sh --config … <unit>` from a laptop |
+| Install on the VM directly | `sudo deploy/install.sh --config deploy/<environment>.env` |
+| Rebuild everything on the VM | `sudo /opt/careconnect/deploy/update.sh` |
 | Release process | [docs/RELEASE.md](../docs/RELEASE.md) |
-| Uninstall on VM | `sudo /opt/careconnect/deploy/uninstall.sh` |
+| Uninstall from the VM | `sudo /opt/careconnect/deploy/uninstall.sh` |
 | API logs | `journalctl -u careconnect-api -f` |
-| Staff login | `admin@se-tools.net` / seeded demo password (ask a teammate) |
-
----
-
-## Deploy Hints
-
-**Ship what CI built, from your laptop:**
-
-```bash
-git fetch --tags && git checkout @careconnect/portal@1.3.0
-./deploy/remote-install.sh --unit portal --config deploy/<environment>.env
-```
-
-- Needs `gh` authenticated (`gh auth login`). The script downloads the newest artifact the Deploy workflow built for that unit and environment (`--environment staging|production`, default production), refuses it if it was built from a different commit than your `HEAD` (override with `ALLOW_STALE=true`), and deploys it in seconds.
-- `--unit all` deploys api, then ehr, then portal.
-
-**Rebuild from your working tree instead:**
-
-```bash
-./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
-```
-
-- Ships whatever is in your working tree and runs `npm ci` plus a full turbo build on the VM (several minutes). Required for a fresh VM; otherwise prefer the artifact path so the VM runs exactly what CI validated.
-- The SSH user, host and key come from the `VM_*` entries in your config file (or the environment). If sudo on the VM needs a password you will be prompted once; the CI deploy user needs passwordless sudo.
-- `deploy/<environment>.env` is gitignored; create it from `careconnect.env.example` on any new laptop, and never paste its contents into docs, issues, or commit messages.
+| Staff login | `admin@se-tools.net` with the seeded demo password (ask a teammate) |

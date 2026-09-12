@@ -213,7 +213,7 @@ self-hosted runner labelled `careconnect-lan`. Install one on any always-on
 LAN host (the staging VM works) with:
 
 ```bash
-VM_USER=<user> VM_HOST=<lan-ip> SSH_KEY=~/.ssh/<key> deploy/setup-runner.sh
+deploy/setup-runner.sh --config deploy/<environment>.env
 ```
 
 It registers the runner and installs it as a systemd service. The deploy

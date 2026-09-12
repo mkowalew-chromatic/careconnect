@@ -6,6 +6,7 @@
 # service under VM_USER and labelled `careconnect-lan`, which
 # .github/workflows/deploy-environment.yml selects with `runs-on`.
 #
+#   deploy/setup-runner.sh --config deploy/<environment>.env
 #   VM_USER=<user> VM_HOST=<lan-ip> [SSH_KEY=~/.ssh/key] deploy/setup-runner.sh
 #
 # Requires the GitHub CLI authenticated with admin access to the repo (to mint
@@ -18,7 +19,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=deploy/lib/remote.sh
 source "${SCRIPT_DIR}/lib/remote.sh"
 
-cc_resolve_ssh_target "${1:-}"
+CONFIG_FILE=""
+case "${1:-}" in
+  --config) CONFIG_FILE="${2:-}" ;;
+  -h|--help) sed -n '3,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  "") ;;
+  *) CONFIG_FILE="$1" ;;
+esac
+cc_resolve_ssh_target "${CONFIG_FILE}"
 
 REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
 RUNNER_NAME="${RUNNER_NAME:-$(ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" hostname)-careconnect}"

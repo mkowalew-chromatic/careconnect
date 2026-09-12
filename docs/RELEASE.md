@@ -205,6 +205,23 @@ required** and has to be approved by hand — from the run's page, or
 `gh api -X POST repos/<owner>/<repo>/actions/runs/<run-id>/approve` — before
 it can merge.
 
+### A self-hosted runner on the LAN
+
+The VMs are on a private network behind a Cloudflare tunnel, so GitHub-hosted
+runners cannot SSH to them. `deploy-environment.yml` therefore runs on a
+self-hosted runner labelled `careconnect-lan`. Install one on any always-on
+LAN host (the staging VM works) with:
+
+```bash
+VM_USER=<user> VM_HOST=<lan-ip> SSH_KEY=~/.ssh/<key> deploy/setup-runner.sh
+```
+
+It registers the runner and installs it as a systemd service. The deploy
+workflow is dispatch-only (never triggered by pull requests), which is what
+makes a self-hosted runner acceptable on a public repository — keep it that
+way. The runner host needs `git`, `curl`, `rsync`, `tar`, `unzip` and
+passwordless `sudo` (for `playwright install --with-deps`).
+
 ### Environments: `staging` and `production`
 
 Create both under **Settings → Environments**. On `production`, add required

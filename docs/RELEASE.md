@@ -171,6 +171,13 @@ environment only.
 Everything in the train degrades gracefully when a piece is missing, but this
 is the intended configuration.
 
+### Actions may open pull requests
+
+**Settings → Actions → General → Workflow permissions → "Allow GitHub
+Actions to create and approve pull requests"** must be on, or `release.yml`
+fails at "Creating pull request" with *GitHub Actions is not permitted to
+create or approve pull requests*. (Off by default on new repositories.)
+
 ### Branch protection on `main`
 
 - Require the **All units passed** status check (from `ci.yml`).
@@ -192,9 +199,11 @@ satisfy the required checks. Create a GitHub App with *Contents: write* and
 | `RELEASE_BOT_APP_ID` | the app id |
 | `RELEASE_BOT_PRIVATE_KEY` | the app's private key (PEM) |
 
-Without these, `release.yml` still works with `GITHUB_TOKEN`; you then need to
-close-and-reopen the Version Packages PR (or push an empty commit to it) to
-get CI to run before merging.
+Without these, `release.yml` still works with `GITHUB_TOKEN`, but CI on the
+Version Packages PR (author `github-actions[bot]`) lands in **action
+required** and has to be approved by hand — from the run's page, or
+`gh api -X POST repos/<owner>/<repo>/actions/runs/<run-id>/approve` — before
+it can merge.
 
 ### Environments: `staging` and `production`
 

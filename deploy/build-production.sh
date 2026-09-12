@@ -79,8 +79,11 @@ for artifact in "${EXPECTED[@]}"; do
   [[ -f "${artifact}" ]] || { echo "ERROR: Build artifact missing: ${artifact}" >&2; exit 1; }
 done
 
-# Only the API ships node_modules; the frontends are static bundles.
-if [[ "${UNIT}" == "api" || "${UNIT}" == "all" ]]; then
+# On-VM source installs (unit=all) run from this tree, so strip dev deps to
+# the production runtime. Single-unit builds are for packaging: the API
+# artifact gets its own production node_modules from package-artifact.sh, and
+# the checkout keeps its dev tools (CI runs the smoke tests right after).
+if [[ "${UNIT}" == "all" ]]; then
   echo "==> Pruning devDependencies (keep production runtime only)..."
   npm prune --omit=dev
 fi

@@ -3,13 +3,13 @@
 [![CI](https://github.com/mkowalew-chromatic/careconnect/actions/workflows/ci.yml/badge.svg)](https://github.com/mkowalew-chromatic/careconnect/actions/workflows/ci.yml)
 [![Chromatic](https://github.com/mkowalew-chromatic/careconnect/actions/workflows/chromatic.yml/badge.svg)](https://github.com/mkowalew-chromatic/careconnect/actions/workflows/chromatic.yml)
 
-**CareConnect** is a healthcare EMR demo inspired by [Ottehr](https://github.com/masslight/ottehr), built with a shared component library instead of Material UI. It is designed for demos on **se-tools.net** and can run locally or on a single Ubuntu VM.
+CareConnect is a demo electronic medical record system for outpatient clinics. It is modeled on [Ottehr](https://github.com/masslight/ottehr) but built on its own component library rather than Material UI. The reference deployment runs on **se-tools.net**; you can also run it on a laptop or a single Ubuntu VM.
 
-The apps and the component library they are built from live together in this monorepo, so a design system change and the app code that consumes it ship in one commit. Each of the four deliverables — API, EHR, Portal, and the design system — is owned by its own team and **versioned, tagged, released and deployed independently** (see [Versioning & Releases](#versioning--releases)).
+The repository contains four pieces: a REST **API**, a staff-facing **EHR**, a **Patient Portal**, and the **design system** both frontends are built from. They share one monorepo so that a component change and the application code that uses it land in the same commit. Each piece is nonetheless owned by its own team and is versioned, tagged, released, and deployed independently; see [Versioning & Releases](#versioning--releases).
 
-**Current versions:** see the [GitHub Releases](https://github.com/mkowalew-chromatic/careconnect/releases) page (one release per unit, tagged `@careconnect/<unit>@<version>`) or each unit's `CHANGELOG.md`; the release process is in [docs/RELEASE.md](docs/RELEASE.md).
+To find the current version of any piece, check [GitHub Releases](https://github.com/mkowalew-chromatic/careconnect/releases) (tags follow the pattern `@careconnect/<unit>@<version>`) or the `CHANGELOG.md` in that piece's directory. The release process is documented in [docs/RELEASE.md](docs/RELEASE.md).
 
-> ⚠️ **Environment config:** deploy commands take a `--config deploy/<environment>.env` file holding that environment's domain, ports, and mode. These files are per-environment secrets and are gitignored — only [`deploy/careconnect.env.example`](deploy/careconnect.env.example) is committed. Copy it to create yours.
+> **Environment configuration.** Deploy commands take `--config deploy/<environment>.env`, which holds the domain, ports, and install mode for one environment. These files contain secrets and are gitignored; only [`deploy/careconnect.env.example`](deploy/careconnect.env.example) is committed. Copy it to create your own.
 
 ---
 
@@ -31,7 +31,7 @@ The apps and the component library they are built from live together in this mon
 
 ## Architecture
 
-CareConnect is an npm workspaces monorepo. A single **REST API** backs all frontends. The staff **EHR app** (which includes a role-gated Billing section) and the **Patient Portal** use **JWT authentication**.
+CareConnect is an npm workspaces monorepo. A single Express REST API serves every frontend and persists to SQLite. The staff EHR (which includes a role-gated Billing section) and the Patient Portal both authenticate with JWTs.
 
 ```
 ┌───────────────────────────────────────────────┐
@@ -55,46 +55,44 @@ CareConnect is an npm workspaces monorepo. A single **REST API** backs all front
                       └─────────────┘
 ```
 
-### Production (Ubuntu VM)
+### Production layout (Ubuntu VM)
 
-On a deployed VM, **nginx** serves static builds and proxies `/api/` to the API. **systemd** runs `careconnect-api` and survives reboot.
+On a production VM, nginx serves the static frontend builds and proxies `/api/` to the API, which runs as the `careconnect-api` systemd service and restarts on reboot.
 
 | Path on VM | Purpose |
 |---|---|
-| `/opt/careconnect` | Application source + `node_modules` + built API |
-| `/var/www/careconnect` | Static frontends (portal, ehr) |
+| `/opt/careconnect` | Application source, `node_modules`, and the built API |
+| `/var/www/careconnect` | Static frontend builds (portal, ehr) |
 | `/var/lib/careconnect` | SQLite database (`careconnect.db`) |
-| `/etc/careconnect/careconnect.env` | Deploy config (domain, mode, ports) |
-| `/etc/careconnect/careconnect-api.env` | API runtime secrets (JWT, data dir) |
+| `/etc/careconnect/careconnect.env` | Deploy configuration (domain, mode, ports) |
+| `/etc/careconnect/careconnect-api.env` | API runtime secrets (JWT secret, data directory) |
 
 ### Shared packages
 
 | Package | Role |
 |---|---|
-| `@careconnect/types` | Shared TypeScript types + intake questionnaire schemas |
-| `@careconnect/api-client` | Fetch wrapper + WebRTC helper for frontends |
-| `@careconnect/mock-data` | Legacy static data (superseded by API in most flows) |
+| `@careconnect/types` | Shared TypeScript types and intake questionnaire schemas |
+| `@careconnect/api-client` | Fetch wrapper and WebRTC helper used by the frontends |
+| `@careconnect/mock-data` | Legacy static data; the API has replaced it in most flows |
 | `@careconnect/design-system` | UI components, design tokens, and Storybook (see [Design System](#design-system)) |
 
 ---
 
 ## Applications & Ports
 
-| App / Service | Workspace | Dev port | Description |
+| Application | Workspace | Dev port | Description |
 |---|---|---|---|
-| API | `@careconnect/api` | **5000** | Auth, clinical, admin, billing, fax, telemed signaling |
-| Staff EHR | `@careconnect/ehr` | **4000** | Tracking board, encounters, fax, labs inbox, AI scribe, admin, role-gated billing (claims, ERAs, patient AR) |
-| Patient Portal | `@careconnect/portal` | **4001** | Booking, walk-in, paperwork, telemed, my visits |
+| API | `@careconnect/api` | **5000** | Authentication, clinical, admin, billing, fax, and telemed signaling |
+| Staff EHR | `@careconnect/ehr` | **4000** | Tracking board, encounters, fax, labs inbox, AI scribe, admin, and role-gated billing (claims, ERAs, patient AR) |
+| Patient Portal | `@careconnect/portal` | **4001** | Booking, walk-in registration, paperwork, telemed, and visit history |
 
-In production, frontends are served on **port 80/443/8080** (see [Deployment Guide](deploy/DEPLOYMENT.md)).
+In production the frontends are served on ports 80, 443, or 8080 depending on the install mode; see the [Deployment Guide](deploy/DEPLOYMENT.md).
 
 ---
 
 ## Demo Accounts & Data
 
-### Staff login (EHR)
-
-All seeded staff users share the same password:
+### Staff accounts (EHR)
 
 | Email | Name | Role |
 |---|---|---|
@@ -105,31 +103,31 @@ All seeded staff users share the same password:
 | `billing@se-tools.net` | Rita Alvarez | Billing |
 | `manager@se-tools.net` | James Patel | Manager |
 
-**Password:** seeded demo password — ask a teammate, not published in this public repo.
+All seeded accounts share one demo password. It is not published in this repository; ask a teammate.
 
-Billing (claims, ERAs, patient AR, master data) lives inside the EHR app under `/billing`, and is role-gated: **Administrator** and **Billing** get full view/edit/delete access; **Manager** gets view-only access; other roles don't see it at all.
+Billing (claims, ERAs, patient AR, and master data) lives inside the EHR at `/billing` and is gated by role. Administrators and Billing users have full view, edit, and delete access; Managers have read-only access; other roles do not see the section.
 
-### Patient portal
+### Patient accounts (Portal)
 
-Sign in with a patient account. Demo: **alice.smith@se-tools.net** (also **bob.johnson@se-tools.net**) — same seeded password as above. Patients see only their own visits, paperwork, and telemed sessions.
+Sign in as `alice.smith@se-tools.net` or `bob.johnson@se-tools.net` with the same seeded password. Patients see only their own visits, paperwork, and telemed sessions.
 
 ### Seeded clinical data
 
-- **Locations:** Main Clinic, Urgent Care West  
-- **Services:** Urgent Care, Virtual Visit, Follow-up, Annual Physical  
-- **Appointments:** ~12 patients with statuses prebooked / in-office / completed / cancelled  
-- **Questionnaires:** Contact info, medical history, insurance, consent  
-- **Insurance payers:** Blue Cross Blue Shield, Aetna  
-- **Sample billing/fax/lab inbox** data added on API startup via migrations  
+- **Locations:** Main Clinic, Urgent Care West
+- **Services:** Urgent Care, Virtual Visit, Follow-up, Annual Physical
+- **Appointments:** roughly a dozen patients across the prebooked, in-office, completed, and cancelled statuses
+- **Questionnaires:** contact information, medical history, insurance, consent
+- **Insurance payers:** Blue Cross Blue Shield, Aetna
+- **Billing, fax, and lab inbox samples:** added by migrations when the API starts
 
 ### Database location
 
 | Environment | Path |
 |---|---|
-| Local dev | `./data/careconnect.db` (when using `deploy/install.sh --local`) |
+| Local development | `./data/careconnect.db` (when installed with `deploy/install.sh --local`) |
 | Production VM | `/var/lib/careconnect/careconnect.db` |
 
-The database is created and seeded automatically on first API start.
+The database is created and seeded the first time the API starts.
 
 ---
 
@@ -137,18 +135,18 @@ The database is created and seeded automatically on first API start.
 
 | Module | Where | Notes |
 |---|---|---|
-| Appointment booking | Portal | 4-step wizard; virtual + in-person |
-| Walk-in registration | Portal | Creates patient + in-office visit |
-| Intake paperwork | Portal + EHR | Multi-form wizard; harvests to chart |
-| Check-in / cancel / reschedule | Portal | |
-| Tracking board | EHR | Filter by status, location, provider |
-| Encounter charting | EHR | Vitals, allergies, meds, HPI, assessment, plan |
-| Labs & eRx | EHR encounter | Demo orders (no external lab/pharmacy) |
+| Appointment booking | Portal | Four-step wizard; virtual and in-person visits |
+| Walk-in registration | Portal | Creates the patient record and an in-office visit |
+| Intake paperwork | Portal + EHR | Multi-form wizard; responses are harvested into the chart |
+| Check-in, cancel, reschedule | Portal | |
+| Tracking board | EHR | Filter by status, location, and provider |
+| Encounter charting | EHR | Vitals, allergies, medications, HPI, assessment, plan |
+| Labs and eRx | EHR encounter | Demo orders only; no external lab or pharmacy integration |
 | Unsolicited lab inbox | EHR | Match inbound results to patients |
-| AI ambient scribe | EHR encounter | Transcript → note → apply to chart |
-| Fax in/out | EHR | Demo PostGrid simulation |
-| Telemed | Portal + EHR | WebRTC via API signaling (STUN only; add TURN for prod) |
-| RCM billing | EHR (`/billing`, role-gated) | Claims, submit, ERAs, patient AR |
+| AI ambient scribe | EHR encounter | Transcript to draft note to chart |
+| Fax in/out | EHR | Simulated PostGrid integration |
+| Telemed | Portal + EHR | WebRTC with signaling through the API (STUN only; add TURN for production) |
+| RCM billing | EHR (`/billing`, role-gated) | Claims, submission, ERAs, patient AR |
 | Admin | EHR | Employees, locations, schedules, questionnaires |
 | Reports | EHR | KPIs, incomplete encounters, payments |
 | Tasks | EHR | Open task queue |
@@ -159,26 +157,26 @@ The database is created and seeded automatically on first API start.
 
 ### Prerequisites
 
-- **Node.js 24** — the version in [`.nvmrc`](.nvmrc), which CI also uses (`nvm use`). The root `engines` field allows 20+ for *running* the built API, but the design-system test toolchain needs 22.22+, so use `.nvmrc` for development.
-- **npm 10+**
+- **Node.js 24**, the version pinned in [`.nvmrc`](.nvmrc) and used by CI (`nvm use`). The root `engines` field accepts Node 20 or later for running the built API, but the design-system test toolchain requires 22.22 or later, so develop on the `.nvmrc` version.
+- **npm 10** or later
 
-### Option A — One-command local setup (macOS/Linux)
+### Option A: one-command setup (macOS and Linux)
 
 ```bash
 git clone https://github.com/mkowalew-chromatic/careconnect.git
 cd careconnect
-deploy/install.sh --local      # npm ci, builds types + design system + API, writes API env
+deploy/install.sh --local      # npm ci, builds types + design system + API, writes the API env file
 ./deploy/start-local.sh        # API :5000, EHR :4000, Portal :4001
 ```
 
-### Option B — Manual dev servers
+### Option B: manual dev servers
 
 ```bash
 npm install
 npm run build --workspace=@careconnect/types   # required by the API
-npm run ds:build                                # required by EHR + Portal (they import the library's dist/)
+npm run ds:build                                # required by EHR and Portal, which import the library's dist/
 
-# Terminal 1 — API (set env for JWT + DB path)
+# Terminal 1: the API needs a JWT secret and database path in its environment
 set -a && source deploy/runtime/careconnect-api.env && set +a
 npm run api:dev
 
@@ -187,22 +185,24 @@ npm run ehr:dev       # http://localhost:4000
 npm run portal:dev    # http://localhost:4001
 ```
 
-The per-app `*:dev` scripts call the workspace directly and bypass turbo, so they do **not** rebuild `@careconnect/types` or the design system for you. Re-run `npm run ds:build` after changing a component (or keep `npm run storybook` open and iterate there), and `npm run build --workspace=@careconnect/types` after changing shared types.
+The `deploy/runtime/careconnect-api.env` file is written by `deploy/install.sh --local`. If you skipped the installer, run it once, or create the file yourself with `NODE_ENV`, `PORT`, `CARECONNECT_DATA_DIR`, and `JWT_SECRET`.
 
-### Other useful root scripts
+The per-app `*:dev` scripts call each workspace directly and bypass Turborepo, so they do not rebuild `@careconnect/types` or the design system for you. After changing a component, run `npm run ds:build` (or keep `npm run storybook` open and iterate there); after changing shared types, run `npm run build --workspace=@careconnect/types`.
+
+### Other root scripts
 
 ```bash
-npm run build         # turbo: builds every workspace in dependency order
+npm run build         # Turborepo builds every workspace in dependency order
 npm run typecheck     # tsc --noEmit in every TypeScript workspace
-npm test              # unit tests (API + design system); excludes smoke tests
+npm test              # unit tests for the API and design system (smoke tests excluded)
 npm run smoke:test    # Playwright smoke tests against a running stack (apps/smoke-tests)
 ```
 
 ### Demo walkthrough
 
-**EHR (`localhost:4000`)** — Log in as `admin@se-tools.net`. Use Tracking Board → Start Encounter. Explore Fax, Lab Inbox, Admin, Reports, AI Scribe tab on encounters. Log in as `billing@se-tools.net` (or `manager@se-tools.net` for view-only) to see the role-gated Billing section — manage claims and ERAs.
+**EHR (`localhost:4000`).** Sign in as `admin@se-tools.net`. From the Tracking Board, start an encounter, then explore Fax, Lab Inbox, Admin, Reports, and the AI Scribe tab on the encounter. Sign in as `billing@se-tools.net` (or `manager@se-tools.net` for read-only access) to see the Billing section and work with claims and ERAs.
 
-**Portal (`localhost:4001`)** — Book a visit, complete paperwork, try walk-in or virtual telemed.
+**Portal (`localhost:4001`).** Book a visit, complete the paperwork, then try a walk-in or a virtual telemed visit.
 
 ---
 
@@ -220,7 +220,7 @@ careconnect/
 │   ├── types/            # Shared types + questionnaire schemas
 │   ├── api-client/       # API client + WebRTC helper
 │   └── mock-data/        # Legacy static demo data
-├── deploy/               # Install + per-unit deploy scripts, nginx, systemd
+├── deploy/               # Install and per-unit deploy scripts, nginx, systemd
 │   ├── install.sh        # Ubuntu production installer (all units, from source)
 │   ├── install-local.sh  # Local dev setup (no sudo)
 │   ├── remote-install.sh # Fresh install, or redeploy CI artifacts, over SSH
@@ -242,17 +242,18 @@ careconnect/
 
 ## Design System
 
-- **Primary:** Teal `#0D7377`  
-- **Accent:** Coral `#E07A5F`  
-- **Font:** Instrument Sans  
-- **Components:** ~40 components — form controls, layout, navigation, data display (Table, DataGrid, charts), and clinical widgets (PatientBanner, VitalSigns, ScheduleCalendar, …). The full list is the export barrel in [`packages/design-system/src/index.ts`](packages/design-system/src/index.ts); browse them in Storybook.
+The design system lives at [`packages/design-system`](packages/design-system) as the private workspace package `@careconnect/design-system`. It ships roughly forty components, spanning form controls, layout, navigation, data display (Table, DataGrid, charts), and clinical widgets such as PatientBanner, VitalSigns, and ScheduleCalendar. The export barrel in [`packages/design-system/src/index.ts`](packages/design-system/src/index.ts) is the authoritative list; Storybook documents each one with healthcare-specific examples.
 
-Components live in this repo at [`packages/design-system`](packages/design-system) as the private workspace package `@careconnect/design-system`, documented in its own Storybook with healthcare-specific examples.
+| Token | Value |
+|---|---|
+| Primary | Teal `#0D7377` |
+| Accent | Coral `#E07A5F` |
+| Typeface | Instrument Sans |
 
 ```bash
 npm run storybook        # browse the components at http://localhost:6006
-npm run ds:build         # build the library (apps depend on its dist/)
-npm run test:stories     # run stories as tests (needs Playwright browsers)
+npm run ds:build         # build the library (the apps depend on its dist/)
+npm run test:stories     # run stories as tests (requires Playwright browsers)
 ```
 
 The apps import it like any other workspace package:
@@ -262,63 +263,63 @@ import { Button, ToastProvider } from '@careconnect/design-system';
 import '@careconnect/design-system/styles';
 ```
 
-Because npm links the workspace locally, `npm run build` builds the library before the apps that consume it — the apps always build against the design system at HEAD, so a component change is picked up without a publish/bump cycle, and a change that breaks the EHR or Portal build fails on the design-system PR. The design system still has its own version, changelog, git tag and GitHub Release, cut by the same release flow as the apps. See [packages/design-system/CONTRIBUTING.md](packages/design-system/CONTRIBUTING.md) for component conventions.
+Because npm links the workspace locally, `npm run build` builds the library before the apps that consume it. The apps therefore always build against the design system at HEAD: a component change is picked up without a publish or version bump, and a change that breaks the EHR or Portal build fails on the design-system pull request. The design system still carries its own version, changelog, git tag, and GitHub Release, cut by the same release flow as the apps. Component conventions are in [packages/design-system/CONTRIBUTING.md](packages/design-system/CONTRIBUTING.md).
 
 ---
 
 ## Deployment
 
-CareConnect supports three deployment paths:
+There are three ways to deploy CareConnect:
 
-| Method | Use when | Doc |
+| Method | Use when | Documentation |
 |---|---|---|
-| **Local dev** | macOS/Linux development | [DEPLOYMENT.md § Local](deploy/DEPLOYMENT.md#local-development) |
-| **Remote SSH** | Deploy from laptop to Ubuntu VM | [DEPLOYMENT.md § Remote](deploy/DEPLOYMENT.md#remote-deployment-ssh) |
-| **On-VM install** | Already SSH'd into Ubuntu | [DEPLOYMENT.md § On-VM](deploy/DEPLOYMENT.md#on-vm-installation) |
+| **Local development** | Working on macOS or Linux | [DEPLOYMENT.md § Local](deploy/DEPLOYMENT.md#local-development) |
+| **Remote over SSH** | Deploying from a laptop to an Ubuntu VM | [DEPLOYMENT.md § Remote](deploy/DEPLOYMENT.md#remote-deployment-ssh) |
+| **On the VM** | Already logged in to the Ubuntu host | [DEPLOYMENT.md § On-VM](deploy/DEPLOYMENT.md#on-vm-installation) |
 
-Each deployable unit (`api`, `ehr`, `portal`) ships on its own: the **Deploy** workflow builds one unit's artifact, deploys it to staging, smoke-tests it, and promotes it to production — dispatched automatically by the release flow for every unit that got a new version, or by hand for any tag. A portal release never restarts the API.
+Each deployable unit (`api`, `ehr`, `portal`) ships on its own. The **Deploy** workflow builds one unit's artifact, deploys it to staging, runs the smoke tests, and promotes it to production. The release flow dispatches it automatically for every unit that received a new version, and you can also dispatch it by hand for any tag. Because units deploy independently, a portal release never restarts the API.
 
-**From your laptop:**
+From your laptop:
 
 ```bash
 # First install on a fresh VM (builds every unit from this checkout)
 ./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env
 
-# Redeploy the latest CI-built artifact of one unit (or all) to an installed VM
+# Redeploy the latest CI-built artifact of one unit (or all units) to an installed VM
 ./deploy/remote-install.sh --unit portal --config deploy/<environment>.env
 ```
 
-See **[deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md)** for install modes, DNS, SSL, updates, troubleshooting, and file paths.
+[deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md) covers install modes, DNS, SSL, updates, troubleshooting, and file paths.
 
 ---
 
 ## Versioning & Releases
 
-CareConnect uses **Semantic Versioning** and **[Changesets](https://github.com/changesets/changesets)**. Four **release units** version, tag, release and deploy independently — one per team:
+CareConnect follows [Semantic Versioning](https://semver.org/) and manages versions with [Changesets](https://github.com/changesets/changesets). There are four release units, one per team, and each is versioned, tagged, released, and deployed independently:
 
 | Unit | Team | Changelog | Tag / GitHub Release | Deployed as |
 |---|---|---|---|---|
-| `@careconnect/api` | Backend | [apps/api/CHANGELOG.md](apps/api/CHANGELOG.md) | `@careconnect/api@X.Y.Z` | systemd service + DB migrations |
-| `@careconnect/ehr` | EHR frontend | [apps/ehr/CHANGELOG.md](apps/ehr/CHANGELOG.md) | `@careconnect/ehr@X.Y.Z` | static bundle behind nginx |
-| `@careconnect/portal` | Portal frontend | [apps/portal/CHANGELOG.md](apps/portal/CHANGELOG.md) | `@careconnect/portal@X.Y.Z` | static bundle behind nginx |
-| `@careconnect/design-system` | Design system | [packages/design-system/CHANGELOG.md](packages/design-system/CHANGELOG.md) | `@careconnect/design-system@X.Y.Z` | not deployed — consumed at HEAD by the apps; Storybook published via Chromatic |
+| `@careconnect/api` | Backend | [apps/api/CHANGELOG.md](apps/api/CHANGELOG.md) | `@careconnect/api@X.Y.Z` | systemd service plus database migrations |
+| `@careconnect/ehr` | EHR frontend | [apps/ehr/CHANGELOG.md](apps/ehr/CHANGELOG.md) | `@careconnect/ehr@X.Y.Z` | Static bundle behind nginx |
+| `@careconnect/portal` | Portal frontend | [apps/portal/CHANGELOG.md](apps/portal/CHANGELOG.md) | `@careconnect/portal@X.Y.Z` | Static bundle behind nginx |
+| `@careconnect/design-system` | Design system | [packages/design-system/CHANGELOG.md](packages/design-system/CHANGELOG.md) | `@careconnect/design-system@X.Y.Z` | Not deployed; the apps consume it at HEAD, and Storybook is published through Chromatic |
 
-Shared packages (`types`, `api-client`, `mock-data`) version independently too but ship inside the units that use them; a bump to one of them automatically patch-bumps its dependents. [CHANGELOG.md](CHANGELOG.md) indexes the per-unit changelogs and keeps the frozen pre-monorepo history.
+The shared packages (`types`, `api-client`, `mock-data`) are versioned independently as well, but they ship inside the units that use them, and bumping one automatically patch-bumps its dependents. The root [CHANGELOG.md](CHANGELOG.md) indexes the per-unit changelogs and preserves the pre-monorepo history.
 
-**Contributors:** after a user-facing change, run `npm run changeset`, select only the workspace(s) you changed, and commit the generated file with your PR. Review ownership per unit is in [.github/CODEOWNERS](.github/CODEOWNERS).
+**Contributing a change.** After making a user-facing change, run `npm run changeset`, select only the workspaces you touched, and commit the generated file with your pull request. Review ownership for each unit is defined in [.github/CODEOWNERS](.github/CODEOWNERS).
 
-**Pipeline:** `ci.yml` runs one job per unit on every PR (only units the PR affects do real work). On merge to `main`, `release.yml` opens or refreshes a **Version Packages** PR; when that merges, it tags each bumped package, creates a GitHub Release per release unit, and dispatches `deploy.yml` for each deployable unit (staging → smoke tests → production, with the production environment's approval rules). Details, one-time GitHub setup, and manual fallbacks: [docs/RELEASE.md](docs/RELEASE.md).
+**Pipeline.** `ci.yml` runs one job per unit on every pull request; only the units the PR touches do real work. On merge to `main`, `release.yml` opens or refreshes a **Version Packages** pull request. When that PR merges, the workflow tags each bumped package, creates a GitHub Release for each release unit, and dispatches `deploy.yml` for each deployable unit (staging, then smoke tests, then production, subject to the production environment's approval rules). Details, the one-time GitHub setup, and manual fallbacks are in [docs/RELEASE.md](docs/RELEASE.md).
 
-Agent rules: follow [AGENTS.md](AGENTS.md).
+AI coding agents working in this repository should follow [AGENTS.md](AGENTS.md).
 
 ---
 
 ## License
 
-MIT — See [LICENSE](LICENSE)
+MIT. See [LICENSE](LICENSE).
 
 Copyright (c) 2026 Martin Kowalewski
 
 ## Acknowledgments
 
-Inspired by [Ottehr](https://github.com/masslight/ottehr) by MassLight. CareConnect is an independent demo with a different UI stack and self-hosted backend.
+CareConnect is inspired by [Ottehr](https://github.com/masslight/ottehr) by MassLight. It is an independent demo with a different UI stack and a self-hosted backend.

@@ -1,5 +1,13 @@
 # @careconnect/portal
 
+## 1.0.4
+
+### Patch Changes
+
+- Updated dependencies [a25de7e]
+- Updated dependencies [f714324]
+  - @careconnect/design-system@0.3.3
+
 ## 1.0.3
 
 ### Patch Changes

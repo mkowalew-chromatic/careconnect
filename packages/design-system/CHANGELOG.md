@@ -1,5 +1,12 @@
 # @careconnect/design-system
 
+## 0.3.3
+
+### Patch Changes
+
+- a25de7e: Figma ↔ Storybook bridge: every story shows its Figma frame in a new Design tab (links kept in `src/figma/links.json`), design tokens are exported to `src/figma/tokens.json` (W3C DTCG, `npm run tokens:export`) for Figma variable import, and new `Foundations/Tokens` sheets document colors, type, spacing, radius and elevation. Workflow in docs/FIGMA.md.
+- f714324: Fix two design tokens that broke their scales: `--cc-text-sm` is now 0.875rem (was 1.375rem, larger than `--cc-text-base`) and `--cc-space-4` is 1rem (was 6rem). Small text and every component that uses the 16px spacing step tighten up accordingly.
+
 ## 0.3.2
 
 ### Patch Changes

@@ -44,7 +44,7 @@
     "build-storybook": "storybook build -o storybook-static",
     "tokens:export": "node scripts/export-figma-tokens.mjs",
     "test": "vitest run --project unit",
-    "test:stories": "vitest run --project storybook",
+    "test:stories": "vitest run --project storybook --outputFile=./test-results/junit-stories.xml",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

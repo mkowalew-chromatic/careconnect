@@ -42,8 +42,8 @@ though the in-repo consumers are updated in the same PR.
 ## Release process
 
 1. Open a PR with your change + changeset. CI runs the `design-system` job
-   (typecheck, unit tests, build) and, because the apps depend on it, the
-   `ehr` and `portal` jobs too. Chromatic posts a visual review.
+   (typecheck, unit tests, story tests, build) and, because the apps depend on
+   it, the `ehr` and `portal` jobs too. Chromatic posts a visual review.
 2. Merge. `release.yml` opens (or refreshes) the repo's **Version Packages**
    PR with the library's bump and changelog entry, plus the automatic patch
    bumps of `ehr`/`portal`.
@@ -59,17 +59,36 @@ fallbacks.
 
 ## Visual review
 
-Every PR touching `packages/design-system/**` runs
-[Chromatic](https://www.chromatic.com/) for visual regression review against the
-component Storybook — see [chromatic.yml](../../.github/workflows/chromatic.yml).
-It uses the official `chromaui/action` with `workingDir: packages/design-system`
-so Chromatic builds this package's Storybook from the monorepo root and, on
-pull requests, reports the build against the PR's head commit — the bare CLI
-would report the synthetic merge commit and the UI Tests / UI Review statuses
-would never reach the PR.
+Every PR runs [Chromatic](https://www.chromatic.com/) for visual regression
+review against the component Storybook — see
+[chromatic.yml](../../.github/workflows/chromatic.yml). It uses the official
+`chromaui/action` with `workingDir: packages/design-system` so Chromatic builds
+this package's Storybook from the monorepo root and, on pull requests, reports
+the build against the PR's head commit — the bare CLI would report the synthetic
+merge commit and the UI Tests / UI Review statuses would never reach the PR.
 
-It needs one repository secret, added under **Settings → Secrets and variables →
-Actions**:
+**Every PR, not just the ones that touch this package.** That is deliberate. A
+`paths:` filter stops the workflow from triggering at all, and GitHub leaves a
+required check that never started pending forever — so with a filter in place,
+requiring **UI Tests** or **UI Review** in branch protection would deadlock every
+PR that happened not to touch `packages/design-system/**`. (A job skipped by an
+`if:` condition is different: it reports a conclusion, which branch protection
+accepts. That is why the missing-token guard is safe and a path filter is not.)
+
+**TurboSnap** (`onlyChanged: true`) is what keeps that affordable. Chromatic
+traces the commit's changed files through Vite's module graph and snapshots only
+the stories they affect: a PR that touches no story costs one Storybook build
+and zero snapshots. It falls back to a full snapshot run when it cannot trace a
+change — a dependency bump, a lockfile change, or the first build on a branch.
+TurboSnap needs the full git history, which is why the job checks out with
+`fetch-depth: 0`.
+
+If your team turns on GitHub's **merge queue**, the workflow already listens on
+`merge_group`, so the Chromatic checks report on queued refs too. Without that
+trigger a required check never arrives and the queue stalls.
+
+Chromatic needs one repository secret, added under **Settings → Secrets and
+variables → Actions**:
 
 | Name | Kind | Notes |
 | --- | --- | --- |
@@ -111,4 +130,7 @@ the contract for apps consuming the library at runtime, not for building it.
 - Style with the `--cc-*` design tokens from `src/styles/` rather than literal
   colors or sizes, so themes and the Chromatic baselines stay coherent.
 - Every component needs at least one story; stories double as browser smoke
-  tests via `npm run test:stories`.
+  tests via `npm run test:stories`, which CI runs on every PR that affects this
+  package. They need Playwright's browsers locally — `npx playwright install
+  chromium`, once per machine — and cover what a pixel diff cannot: play
+  functions and the a11y checks. Chromatic's snapshots are the other half.

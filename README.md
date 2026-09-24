@@ -195,8 +195,19 @@ The per-app `*:dev` scripts call each workspace directly and bypass Turborepo, s
 npm run build         # Turborepo builds every workspace in dependency order
 npm run typecheck     # tsc --noEmit in every TypeScript workspace
 npm test              # unit tests for the API and design system (smoke tests excluded)
+npm run test:stories  # every design-system story as a browser test
 npm run smoke:test    # Playwright smoke tests against a running stack (apps/smoke-tests)
 ```
+
+Both Playwright-backed suites need the browser binaries downloaded once per
+machine — `npm install` does not fetch them, and without them the suites fail
+with `browserType.launch: Executable doesn't exist`:
+
+```bash
+npx playwright install chromium
+```
+
+CI installs them the same way, so a green run locally means a green run there.
 
 ### Demo walkthrough
 
@@ -253,7 +264,8 @@ The design system lives at [`packages/design-system`](packages/design-system) as
 ```bash
 npm run storybook        # browse the components at http://localhost:6006
 npm run ds:build         # build the library (the apps depend on its dist/)
-npm run test:stories     # run stories as tests (requires Playwright browsers)
+npm run test:stories     # run every story as a browser test
+                         # (needs `npx playwright install chromium` once)
 ```
 
 The apps import it like any other workspace package:
@@ -308,7 +320,7 @@ The shared packages (`types`, `api-client`, `mock-data`) are versioned independe
 
 **Contributing a change.** After making a user-facing change, run `npm run changeset`, select only the workspaces you touched, and commit the generated file with your pull request. Review ownership for each unit is defined in [.github/CODEOWNERS](.github/CODEOWNERS).
 
-**Pipeline.** `ci.yml` runs one job per unit on every pull request; only the units the PR touches do real work. On merge to `main`, `release.yml` opens or refreshes a **Version Packages** pull request. When that PR merges, the workflow tags each bumped package, creates a GitHub Release for each release unit, and dispatches `deploy.yml` for each deployable unit (staging, then smoke tests, then production, subject to the production environment's approval rules). Details, the one-time GitHub setup, and manual fallbacks are in [docs/RELEASE.md](docs/RELEASE.md).
+**Pipeline.** `ci.yml` runs one job per unit on every pull request; only the units the PR touches do real work. The design-system job also runs every story as a browser test. `chromatic.yml` runs on every pull request too — deliberately without a `paths:` filter, so its checks can safely be required in branch protection: a workflow held back by a path filter never starts, and a required check that never starts blocks the pull request forever. TurboSnap keeps that cheap by snapshotting only the stories a commit actually affects. Both workflows also listen on `merge_group`, so their checks still report if you turn on GitHub's merge queue. On merge to `main`, `release.yml` opens or refreshes a **Version Packages** pull request. When that PR merges, the workflow tags each bumped package, creates a GitHub Release for each release unit, and dispatches `deploy.yml` for each deployable unit (staging, then smoke tests, then production, subject to the production environment's approval rules). Details, the one-time GitHub setup, and manual fallbacks are in [docs/RELEASE.md](docs/RELEASE.md).
 
 AI coding agents working in this repository should follow [AGENTS.md](AGENTS.md).
 

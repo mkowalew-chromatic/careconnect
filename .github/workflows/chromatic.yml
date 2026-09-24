@@ -72,8 +72,10 @@ jobs:
           exitZeroOnChanges: true
           autoAcceptChanges: ${{ github.event_name == 'push' }}
           # TurboSnap: snapshot only the stories the commit actually affects,
-          # traced through Vite's module graph. Needs the full git history
-          # fetched above; the CLI adds `--stats-json` to build-storybook
-          # itself. Chromatic falls back to a full build when it can't trace a
-          # change (dependency bumps, or the first build on a branch).
+          # traced through the module graph. Needs the full git history fetched
+          # above. The CLI appends the stats-json flag to build-storybook on its
+          # own, so the build script needs no change. Chromatic falls back to a
+          # full run when it can't trace a change (the first build on a branch);
+          # when it can, it bypasses every unaffected snapshot and carries the
+          # ancestor build's status over.
           onlyChanged: true

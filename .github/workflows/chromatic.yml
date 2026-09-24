@@ -1,19 +1,32 @@
 name: Chromatic
 
-# Design-system visual review. Runs on PRs that touch the design system and on
-# main after they merge — the main run auto-accepts, so the baseline every PR
-# is compared against is whatever is on main, not the last manually accepted
+# Design-system visual review. The main run auto-accepts, so the baseline every
+# PR is compared against is whatever is on main, not the last manually accepted
 # build.
+#
+# Deliberately unfiltered by path. A `paths:` filter would stop the workflow
+# from triggering at all on PRs that miss it, and a check that never starts
+# stays pending forever — so requiring Chromatic's "UI Tests" / "UI Review"
+# status in branch protection would deadlock every non-design-system PR. (A job
+# skipped by an `if:` is different: it reports a conclusion, which branch
+# protection accepts.) TurboSnap makes the unfiltered runs cheap — a PR that
+# touches no story snapshots nothing and bills nothing; the cost is one
+# Storybook build per run.
 on:
   pull_request:
-    paths:
-      - 'packages/design-system/**'
-      - 'package-lock.json'
   push:
     branches: [main]
-    paths:
-      - 'packages/design-system/**'
-      - 'package-lock.json'
+  # Required checks must also report on merge-queue refs, or the queue stalls
+  # waiting for a status that never arrives. Harmless when no queue is enabled.
+  merge_group:
+
+# Cancel superseded PR runs — a new push to a PR makes the previous Chromatic
+# build irrelevant. Main runs are never cancelled: each one auto-accepts and
+# becomes the baseline for later PRs, so losing one would leave the next PR
+# comparing against a stale build.
+concurrency:
+  group: chromatic-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   visual-review:
@@ -21,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     # Chromatic can't run without a project token; skip rather than fail red on
     # forks and on repos where the secret hasn't been set up yet.
-    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     permissions:
       contents: read
       pull-requests: write
@@ -58,3 +71,11 @@ jobs:
           workingDir: packages/design-system
           exitZeroOnChanges: true
           autoAcceptChanges: ${{ github.event_name == 'push' }}
+          # TurboSnap: snapshot only the stories the commit actually affects,
+          # traced through the module graph. Needs the full git history fetched
+          # above. The CLI appends the stats-json flag to build-storybook on its
+          # own, so the build script needs no change. Chromatic falls back to a
+          # full run when it can't trace a change (the first build on a branch);
+          # when it can, it bypasses every unaffected snapshot and carries the
+          # ancestor build's status over.
+          onlyChanged: true

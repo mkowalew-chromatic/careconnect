@@ -4,10 +4,15 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Required checks must also report on merge-queue refs, or the queue stalls
+  # waiting for a status that never arrives. Harmless when no queue is enabled.
+  merge_group:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Not on merge-queue refs: cancelling a queued check ejects the PR from the
+  # queue. Pushes to main are cheap to let finish and back the release train.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # One job per release unit so each team gets its own required status check
 # ("CI / api", "CI / ehr", "CI / portal", "CI / design-system"). On pull
@@ -44,9 +49,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Stories run as real browser tests (play functions, a11y checks) — what
+      # Chromatic's pixel diff doesn't cover. Only the design system defines
+      # `test:stories`; for the other units turbo resolves it to a no-op, so the
+      # browser is installed only where it is used.
+      - name: Install Playwright browser
+        if: matrix.unit == 'design-system'
+        run: npx playwright install --with-deps chromium
+
       - name: Typecheck, test, build (${{ matrix.unit }})
         run: >
-          npx turbo run typecheck test build
+          npx turbo run typecheck test test:stories build
           --filter=@careconnect/${{ matrix.unit }}
           ${{ github.event_name == 'pull_request' && '--affected' || '' }}
 
@@ -55,7 +68,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: junit-design-system
-          path: packages/design-system/test-results/junit.xml
+          # junit.xml from the unit suite, junit-stories.xml from the stories.
+          path: packages/design-system/test-results/*.xml
           if-no-files-found: ignore
 
   # Single aggregate check for branch protection, so the rule doesn't need

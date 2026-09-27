@@ -90,11 +90,11 @@ Or scope any of this package's own scripts with `-w @careconnect/design-system`:
 npm run test -w @careconnect/design-system
 ```
 
-Every story also doubles as a smoke test, run in a real browser. That needs Playwright's
-browsers downloaded once:
+Every story also doubles as a smoke test, run in a real browser. The root
+`npm install` fetches that browser for you via its `postinstall` hook, so this
+just works on a fresh clone:
 
 ```bash
-npx playwright install chromium
 npm run test:stories
 ```
 

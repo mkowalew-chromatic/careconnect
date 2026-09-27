@@ -49,7 +49,10 @@ fi
 
 if [[ "${SKIP_INSTALL:-false}" != "true" ]]; then
   echo "==> Installing npm dependencies (including dev, for build)..."
-  npm ci --include=dev
+  # The root postinstall downloads a Playwright browser for the test suites.
+  # This path builds production assets -- on a VM it runs as the service user
+  # with HOME under the install dir -- and never runs those suites, so skip it.
+  CARECONNECT_SKIP_PLAYWRIGHT_BROWSERS=1 npm ci --include=dev
 fi
 
 # turbo builds each unit's workspace dependencies first (types, design system).

@@ -11,6 +11,7 @@
     "node": ">=20.0.0"
   },
   "scripts": {
+    "postinstall": "node scripts/install-playwright-browsers.mjs",
     "dev": "turbo dev",
     "build": "turbo build",
     "typecheck": "turbo typecheck",

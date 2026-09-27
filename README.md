@@ -199,15 +199,20 @@ npm run test:stories  # every design-system story as a browser test
 npm run smoke:test    # Playwright smoke tests against a running stack (apps/smoke-tests)
 ```
 
-Both Playwright-backed suites need the browser binaries downloaded once per
-machine — `npm install` does not fetch them, and without them the suites fail
-with `browserType.launch: Executable doesn't exist`:
+Both Playwright-backed suites drive a real chromium. `npm install` fetches it
+for you through a `postinstall` hook, so there is no separate setup step. If
+you ever need it by hand — a skipped hook, a wiped browser cache:
 
 ```bash
 npx playwright install chromium
 ```
 
-CI installs them the same way, so a green run locally means a green run there.
+The hook is a no-op once the browser is cached, and it never fails the install:
+a blocked download prints a warning and points at the command above. It is
+skipped when `CI` is set (the workflows install a browser only in the jobs that
+need one) and when `CARECONNECT_SKIP_PLAYWRIGHT_BROWSERS=1`, which is what
+`deploy/build-production.sh` sets so VM builds don't pull a browser they never
+run.
 
 ### Demo walkthrough
 
@@ -265,7 +270,6 @@ The design system lives at [`packages/design-system`](packages/design-system) as
 npm run storybook        # browse the components at http://localhost:6006
 npm run ds:build         # build the library (the apps depend on its dist/)
 npm run test:stories     # run every story as a browser test
-                         # (needs `npx playwright install chromium` once)
 ```
 
 The apps import it like any other workspace package:

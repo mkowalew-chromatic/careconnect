@@ -131,6 +131,6 @@ the contract for apps consuming the library at runtime, not for building it.
   colors or sizes, so themes and the Chromatic baselines stay coherent.
 - Every component needs at least one story; stories double as browser smoke
   tests via `npm run test:stories`, which CI runs on every PR that affects this
-  package. They need Playwright's browsers locally — `npx playwright install
-  chromium`, once per machine — and cover what a pixel diff cannot: play
-  functions and the a11y checks. Chromatic's snapshots are the other half.
+  package. The root `npm install` fetches the browser they need, so there is
+  nothing to set up. They cover what a pixel diff cannot — play functions and
+  the a11y checks; Chromatic's snapshots are the other half.

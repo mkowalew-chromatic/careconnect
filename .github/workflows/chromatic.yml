@@ -83,3 +83,10 @@ jobs:
           # when it can, it bypasses every unaffected snapshot and carries the
           # ancestor build's status over.
           onlyChanged: true
+          # The LoginScreen stories render DESIGN_SYSTEM_VERSION (a build-time
+          # define from this package.json) and the apps' versions (imported
+          # from theirs). TurboSnap ignores version-only package.json changes,
+          # so a Version Packages merge would skip the build and leave the main
+          # permalink showing the previous release. Matched against paths from
+          # the repo root.
+          externals: '{packages/design-system,apps/ehr,apps/portal}/package.json'

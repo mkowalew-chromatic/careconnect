@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
+import { expect } from 'storybook/test';
 import { TabPanel, Tabs } from './Tabs';
 import { figmaDesign } from '../../figma/links';
 
@@ -30,6 +31,17 @@ export const AppointmentTabs: Story = {
         </TabPanel>
       </div>
     );
+  },
+};
+
+// Interaction test: clicking a tab selects it and swaps the panel.
+export const SwitchesOnClick: Story = {
+  ...AppointmentTabs,
+  play: async ({ canvas, userEvent }) => {
+    const completed = canvas.getByRole('tab', { name: /Completed/ });
+    await userEvent.click(completed);
+    await expect(completed).toHaveAttribute('aria-selected', 'true');
+    await expect(canvas.getByText('Showing completed appointments')).toBeInTheDocument();
   },
 };
 

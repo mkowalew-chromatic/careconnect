@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { LoginScreen } from './LoginScreen';
 import { DESIGN_SYSTEM_VERSION } from '../..';
 import { figmaDesign } from '../../figma/links';
+import { allModes } from '../../../.storybook/modes';
 
 const meta: Meta<typeof LoginScreen> = {
   title: 'Components/LoginScreen',
@@ -12,6 +13,7 @@ const meta: Meta<typeof LoginScreen> = {
   parameters: {
     design: figmaDesign('Components/LoginScreen'),
     layout: 'fullscreen',
+    chromatic: { modes: { mobile: allModes.mobile, desktop: allModes.desktop } },
   },
 };
 

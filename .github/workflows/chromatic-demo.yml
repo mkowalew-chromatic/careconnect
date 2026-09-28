@@ -1,0 +1,75 @@
+name: Chromatic demo
+
+# Re-opens the Chromatic demo storylines every Monday as draft PRs off a fresh
+# main, one PR per chapter:
+#   local-storybook     frontend developers running Storybook locally (4 chapters)
+#   design-system       platform / engineering leads (6 chapters)
+#   design-handoff      UX design and frontend teams (7 chapters)
+#   agentic-ui          teams adopting AI coding agents for UI (5 chapters)
+# The chapters and their narrative live in scripts/chromatic-demo/chapters.mjs;
+# the presenter guide is docs/CHROMATIC-DEMO.md. Within each storyline the
+# chapters climb the Chromatic maturity levels (L1 catch changes → L4 scale),
+# and every PR carries a `demo: L<n> …` label.
+#
+# Each run closes the previous run's demo PRs first, so at most one PR per
+# chapter is ever open. Demo PRs are drafts labeled `chromatic-demo` and must
+# never be merged.
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      storyline:
+        description: Storyline to (re)open
+        type: choice
+        default: all
+        options:
+          - all
+          - local-storybook
+          - design-system
+          - design-handoff
+          - agentic-ui
+      chapter:
+        description: One chapter slug of that storyline, or "all" (see scripts/chromatic-demo/chapters.mjs)
+        type: string
+        default: all
+
+concurrency:
+  group: chromatic-demo
+  cancel-in-progress: false
+
+jobs:
+  open-demo-prs:
+    name: Open demo PRs
+    runs-on: ubuntu-latest
+    # Forks have no Chromatic token and no business opening PRs here.
+    if: github.repository == 'mkowalew-chromatic/careconnect'
+    permissions:
+      contents: write # push demo/chromatic/* branches
+      pull-requests: write # open, edit and close the demo PRs
+      issues: write # create the chromatic-demo label
+      actions: write # dispatch chromatic.yml on each demo branch
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Configure git author
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      # PRs opened with GITHUB_TOKEN don't trigger pull_request workflows, so
+      # the script dispatches chromatic.yml on each demo branch itself.
+      - name: Open the storyline
+        env:
+          STORYLINE: ${{ inputs.storyline || 'all' }}
+          CHAPTER: ${{ inputs.chapter || 'all' }}
+        run: node scripts/chromatic-demo/run.mjs --storyline "$STORYLINE" --chapter "$CHAPTER"

@@ -20,6 +20,7 @@ Four **release units**, each owned by its own team and released independently �
 | Typecheck / tests | `npm run typecheck` (every TS workspace) · `npm test` (API + design system unit tests) · `npm run test:stories` (every design-system story as a browser test) · `npm run smoke:test` (Playwright, needs a running stack) |
 | Playwright browsers | Automatic — the root `postinstall` ([scripts/install-playwright-browsers.mjs](scripts/install-playwright-browsers.mjs)) fetches chromium for `test:stories` and `smoke:test`. By hand: `npx playwright install chromium`. Skipped when `CI` is set or `CARECONNECT_SKIP_PLAYWRIGHT_BROWSERS=1`; never fails the install. |
 | Component library / Storybook | `npm run storybook` → http://localhost:6006 |
+| Chromatic demo storylines | [docs/CHROMATIC-DEMO.md](docs/CHROMATIC-DEMO.md) — scheduled draft PRs, never merge them. Chapters patch real components by anchor text; if CI's "Check Chromatic demo chapters still apply" fails, update the chapter in `scripts/chromatic-demo/chapters.mjs` in the same PR |
 | Figma ↔ Storybook bridge | [docs/FIGMA.md](docs/FIGMA.md) — Figma URLs in `packages/design-system/src/figma/links.json`; after editing `tokens.css` run `npm run tokens:export --workspace=@careconnect/design-system` |
 | Staff login | `admin@se-tools.net` / seeded demo password (ask a teammate) |
 | Billing role login | `billing@se-tools.net` (full access) or `manager@se-tools.net` (view-only) / same seeded password |

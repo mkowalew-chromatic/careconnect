@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect } from 'storybook/test';
 import { Switch } from './Switch';
 import { figmaDesign } from '../../figma/links';
 
@@ -16,4 +17,16 @@ export const Focus: Story = {
 
 export const Disabled: Story = {
   args: { label: 'Telemed visit', disabled: true },
+};
+
+// Interaction test: the whole row is the hit target, not just the track.
+// Chromatic runs this play function on every build alongside the snapshot.
+export const TogglesFromLabel: Story = {
+  args: { label: 'Telemed visit' },
+  play: async ({ canvas, userEvent }) => {
+    const toggle = canvas.getByRole('switch', { name: 'Telemed visit' });
+    await expect(toggle).not.toBeChecked();
+    await userEvent.click(canvas.getByText('Telemed visit'));
+    await expect(toggle).toBeChecked();
+  },
 };

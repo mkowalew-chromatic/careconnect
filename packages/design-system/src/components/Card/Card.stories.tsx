@@ -2,10 +2,14 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Card, CardContent, CardHeader, CardTitle } from './Card';
 import { Badge } from '../Badge';
 import { figmaDesign } from '../../figma/links';
+import { allModes } from '../../../.storybook/modes';
 
 const meta: Meta<typeof Card> = {
   title: 'Components/Card',
-  parameters: { design: figmaDesign('Components/Card') },
+  parameters: {
+    design: figmaDesign('Components/Card'),
+    chromatic: { modes: { light: allModes.light, dark: allModes.dark } },
+  },
   component: Card,
   tags: ['autodocs'],
 };

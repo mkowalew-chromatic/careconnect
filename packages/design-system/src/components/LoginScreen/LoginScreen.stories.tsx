@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { LoginScreen } from './LoginScreen';
 import { DESIGN_SYSTEM_VERSION } from '../..';
 import { figmaDesign } from '../../figma/links';
+// The Portal and EHR stories show the same app versions the deployed apps do.
+import { version as portalVersion } from '../../../../../apps/portal/package.json';
+import { version as ehrVersion } from '../../../../../apps/ehr/package.json';
 import { allModes } from '../../../.storybook/modes';
 
 const meta: Meta<typeof LoginScreen> = {
@@ -70,7 +73,7 @@ export const Portal: Story = {
       email="demo.user@example.com"
       formSubtitle="Patient Portal"
       demoHint="demo.user@example.com / SampleDemoPass1!"
-      appVersion="1.0.0"
+      appVersion={portalVersion}
       designSystemVersion={DESIGN_SYSTEM_VERSION}
     />
   ),
@@ -91,7 +94,7 @@ export const EHR: Story = {
       formSubtitle="Staff Sign In"
       email="demo.user@example.com"
       demoHint="demo.user@example.com / SampleDemoPass1!"
-      appVersion="1.0.0"
+      appVersion={ehrVersion}
       designSystemVersion={DESIGN_SYSTEM_VERSION}
     />
   ),

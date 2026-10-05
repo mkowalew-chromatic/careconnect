@@ -30,7 +30,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
           </button>
         ))}
       </div>
-      <Button variant="ghost" size="sm" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
+      <Button variant="ghost" size="sm" disabled={page >= totalPages} onClick={() => page < totalPages - 1 && onPageChange(page + 1)}>Next</Button>
     </nav>
   );
 }

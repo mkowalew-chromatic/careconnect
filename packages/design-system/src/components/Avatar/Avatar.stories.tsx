@@ -14,6 +14,7 @@ type Story = StoryObj<typeof Avatar>;
 
 export const Default: Story = { args: { name: 'Alice Smith' } };
 export const Large: Story = { args: { name: 'Bob Johnson', size: 'lg' } };
+export const ExtraLarge: Story = { args: { name: 'Carmen Ortiz', size: 'xl' } };
 export const Patient: Story = {
   render: () => <PatientAvatar patient={{ firstName: 'Diana', lastName: 'Williams' }} size="lg" />,
 };

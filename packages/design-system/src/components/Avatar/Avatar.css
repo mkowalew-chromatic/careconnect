@@ -26,3 +26,9 @@
   height: 48px;
   font-size: var(--cc-text-sm);
 }
+
+.cc-avatar--xl {
+  width: 64px;
+  height: 64px;
+  font-size: var(--cc-text-lg);
+}

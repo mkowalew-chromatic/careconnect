@@ -3,7 +3,7 @@ import './Avatar.css';
 
 export interface AvatarProps {
   name: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   src?: string;
 }
 
@@ -47,6 +47,6 @@ export function Avatar({ name, size = 'md', src }: AvatarProps) {
   );
 }
 
-export function PatientAvatar({ patient, size = 'md' }: { patient: { firstName: string; lastName: string }; size?: 'sm' | 'md' | 'lg' }) {
+export function PatientAvatar({ patient, size = 'md' }: { patient: { firstName: string; lastName: string }; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
   return <Avatar name={`${patient.firstName} ${patient.lastName}`} size={size} />;
 }

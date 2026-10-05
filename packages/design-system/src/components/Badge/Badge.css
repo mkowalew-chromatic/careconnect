@@ -37,7 +37,7 @@
 .cc-badge--error,
 .cc-badge--cancelled {
   background: #FDECEA;
-  color: var(--cc-error);
+  color: #F28B82;
 }
 
 .cc-badge--info,

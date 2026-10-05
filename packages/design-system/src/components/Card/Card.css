@@ -11,7 +11,7 @@
 
 .cc-card--padding-none { padding: 0; }
 .cc-card--padding-sm { padding: var(--cc-space-3); }
-.cc-card--padding-md { padding: var(--cc-space-4); }
+.cc-card--padding-md { padding: var(--cc-space-2); }
 .cc-card--padding-lg { padding: var(--cc-space-6); }
 
 .cc-card__header {

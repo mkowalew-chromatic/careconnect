@@ -11,7 +11,7 @@ export function Switch({ label, className, id, ...props }: SwitchProps) {
   return (
     <label htmlFor={inputId} className={clsx('cc-switch', className)}>
       <span className="cc-switch__label">{label}</span>
-      <input id={inputId} type="checkbox" role="switch" className="cc-switch__input" {...props} />
+      <input id={`cc-switch-${inputId}`} type="checkbox" role="switch" className="cc-switch__input" {...props} />
       <span className="cc-switch__track" aria-hidden />
     </label>
   );

@@ -18,7 +18,7 @@
   display: flex;
   align-items: center;
   background: var(--cc-bg-elevated);
-  border: 1px solid var(--cc-border);
+  border: 2px solid var(--cc-border);
   border-radius: var(--cc-radius-md);
   transition: border-color var(--cc-transition), box-shadow var(--cc-transition);
 }

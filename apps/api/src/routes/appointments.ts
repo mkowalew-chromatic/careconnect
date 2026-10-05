@@ -101,7 +101,7 @@ appointmentsRouter.get('/:id', authRequired, (req, res) => {
   const id = String(req.params.id);
   if (!assertAppointmentAccess(req, res, id)) return;
   const row = queryOne('SELECT * FROM appointments WHERE id = ?', id);
-  if (!row) { res.status(404).json({ error: 'Not found' }); return; }
+  if (!row) { res.status(404).json({ error: 'Appointment not found' }); return; }
   res.json(mapAppointment(row));
 });
 
@@ -153,7 +153,7 @@ appointmentsRouter.post('/:id/check-in', authRequired, (req, res) => {
   if (!assertAppointmentAccess(req, res, id)) return;
   execute("UPDATE appointments SET status = 'in-office', check_in_time = datetime('now') WHERE id = ? AND status = 'prebooked'", id);
   const appt = queryOne('SELECT * FROM appointments WHERE id = ?', id);
-  if (!appt) { res.status(404).json({ error: 'Not found' }); return; }
+  if (!appt) { res.status(404).json({ error: 'Appointment not found' }); return; }
   const existing = queryOne('SELECT id FROM encounters WHERE appointment_id = ?', id);
   if (!existing) {
     execute(`INSERT INTO encounters (id, appointment_id, patient_id, status, chief_complaint) VALUES (?, ?, ?, 'in-progress', ?)`,
@@ -167,7 +167,7 @@ appointmentsRouter.patch('/:id/cancel', authRequired, (req, res) => {
   if (!assertAppointmentAccess(req, res, id)) return;
   execute("UPDATE appointments SET status = 'cancelled' WHERE id = ?", id);
   const row = queryOne('SELECT * FROM appointments WHERE id = ?', id);
-  if (!row) { res.status(404).json({ error: 'Not found' }); return; }
+  if (!row) { res.status(404).json({ error: 'Appointment not found' }); return; }
   res.json(mapAppointment(row));
 });
 
@@ -180,6 +180,6 @@ appointmentsRouter.patch('/:id/reschedule', authRequired, (req, res) => {
     scheduledTime, providerId, locationId, id,
   );
   const row = queryOne('SELECT * FROM appointments WHERE id = ?', id);
-  if (!row) { res.status(404).json({ error: 'Not found' }); return; }
+  if (!row) { res.status(404).json({ error: 'Appointment not found' }); return; }
   res.json(mapAppointment(row));
 });

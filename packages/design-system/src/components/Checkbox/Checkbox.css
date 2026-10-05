@@ -30,8 +30,7 @@
 }
 
 .cc-checkbox__input:focus-visible + .cc-checkbox__box {
-  outline: 2px solid var(--cc-primary-light);
-  outline-offset: 2px;
+  outline: none;
 }
 
 .cc-checkbox__label {

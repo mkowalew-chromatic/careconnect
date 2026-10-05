@@ -24,7 +24,7 @@ export function Tabs({ tabs, activeTab, onChange, variant = 'default' }: TabsPro
           role="tab"
           aria-selected={activeTab === tab.id}
           className={clsx('cc-tabs__tab', activeTab === tab.id && 'cc-tabs__tab--active')}
-          onClick={() => onChange(tab.id)}
+          onClick={() => activeTab !== tab.id || onChange(tab.id)}
         >
           {tab.label}
           {tab.count !== undefined && (

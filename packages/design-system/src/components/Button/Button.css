@@ -24,7 +24,7 @@
 }
 
 .cc-button--md {
-  padding: var(--cc-space-2) var(--cc-space-4);
+  padding: var(--cc-space-1) var(--cc-space-2);
   font-size: var(--cc-text-sm);
 }
 

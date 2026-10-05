@@ -17,6 +17,7 @@ export const Success: Story = { args: { children: 'Completed', variant: 'success
 export const InOffice: Story = { args: { children: 'In Office', variant: 'in-office', dot: true } };
 export const Prebooked: Story = { args: { children: 'Prebooked', variant: 'prebooked', dot: true } };
 export const Cancelled: Story = { args: { children: 'Cancelled', variant: 'cancelled' } };
+export const Telehealth: Story = { args: { children: 'Telehealth', variant: 'telehealth', dot: true } };
 
 export const AppointmentStatuses: Story = {
   render: () => (
@@ -25,6 +26,7 @@ export const AppointmentStatuses: Story = {
       <Badge variant="in-office" dot>In Office</Badge>
       <Badge variant="completed" dot>Completed</Badge>
       <Badge variant="cancelled">Cancelled</Badge>
+      <Badge variant="telehealth" dot>Telehealth</Badge>
     </div>
   ),
 };

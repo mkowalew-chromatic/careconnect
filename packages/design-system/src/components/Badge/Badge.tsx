@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import type { HTMLAttributes, ReactNode } from 'react';
 import './Badge.css';
 
-export type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info' | 'prebooked' | 'in-office' | 'completed' | 'cancelled';
+export type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info' | 'prebooked' | 'in-office' | 'completed' | 'cancelled' | 'telehealth';
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;

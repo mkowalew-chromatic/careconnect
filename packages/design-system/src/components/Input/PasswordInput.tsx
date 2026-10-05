@@ -41,7 +41,6 @@ export function PasswordInput({
           type="button"
           className="cc-password-input__toggle"
           onClick={() => setVisible((v) => !v)}
-          aria-label={visible ? 'Hide password' : 'Show password'}
           tabIndex={-1}
         >
           {visible ? (

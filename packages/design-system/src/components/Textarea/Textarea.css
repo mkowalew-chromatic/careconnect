@@ -15,4 +15,4 @@
 .cc-textarea:focus { outline: none; border-color: var(--cc-primary); box-shadow: 0 0 0 3px var(--cc-primary-subtle); }
 .cc-textarea--error { border-color: var(--cc-error); }
 .cc-textarea__error { font-size: var(--cc-text-xs); color: var(--cc-error); }
-.cc-textarea__hint { font-size: var(--cc-text-xs); color: var(--cc-text-muted); }
+.cc-textarea__hint { font-size: var(--cc-text-xs); color: #B8C2CC; }

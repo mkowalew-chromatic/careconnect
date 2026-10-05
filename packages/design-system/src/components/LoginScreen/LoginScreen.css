@@ -202,7 +202,7 @@
 
 @media (max-width: 480px) {
   .cc-login-screen__stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: var(--cc-space-4);
   }
 }

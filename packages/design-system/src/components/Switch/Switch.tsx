@@ -9,7 +9,7 @@ export interface SwitchProps extends Omit<InputHTMLAttributes<HTMLInputElement>,
 export function Switch({ label, className, id, ...props }: SwitchProps) {
   const inputId = id ?? label.toLowerCase().replace(/\s+/g, '-');
   return (
-    <label htmlFor={inputId} className={clsx('cc-switch', className)}>
+    <label htmlFor={inputId} className={clsx('cc-switch', className)} onClick={(event) => event.preventDefault()}>
       <span className="cc-switch__label">{label}</span>
       <input id={inputId} type="checkbox" role="switch" className="cc-switch__input" {...props} />
       <span className="cc-switch__track" aria-hidden />

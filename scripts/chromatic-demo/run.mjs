@@ -174,8 +174,11 @@ ${storyline.outcomes.map((o) => `- **${o.outcome}**, measured by ${o.measure.cha
 }
 
 gh('label', 'create', LABEL, '--force', '--color', 'FC521F', '--description', "Scripted Chromatic demo PR. Don't merge.");
-for (const [level, { summary }] of Object.entries(LEVELS)) {
-  gh('label', 'create', levelLabel(level), '--force', '--color', LEVEL_COLORS[level], '--description', `Chromatic demo maturity level ${level}: ${summary}`);
+for (const [level, { name, summary }] of Object.entries(LEVELS)) {
+  // GitHub rejects label descriptions over 100 characters.
+  const description = `${name}: ${summary}`;
+  const clipped = description.length > 100 ? `${description.slice(0, 99)}…` : description;
+  gh('label', 'create', levelLabel(level), '--force', '--color', LEVEL_COLORS[level], '--description', clipped);
 }
 
 // Close last run's PRs for the chapters being reopened, and delete their

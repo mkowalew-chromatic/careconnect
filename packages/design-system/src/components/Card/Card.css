@@ -27,7 +27,7 @@
   margin: 0;
   font-size: var(--cc-text-lg);
   font-weight: 600;
-  color: var(--cc-text);
+  color: #1A2332;
 }
 
 .cc-card__content {

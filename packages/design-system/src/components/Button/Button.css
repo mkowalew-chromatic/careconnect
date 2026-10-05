@@ -53,6 +53,16 @@
   background: var(--cc-bg-muted);
 }
 
+.cc-button--outline {
+  background: transparent;
+  color: var(--cc-primary);
+  box-shadow: inset 0 0 0 1px var(--cc-primary);
+}
+
+.cc-button--outline:hover:not(:disabled) {
+  background: var(--cc-primary-subtle);
+}
+
 .cc-button--ghost {
   background: transparent;
   color: var(--cc-primary);

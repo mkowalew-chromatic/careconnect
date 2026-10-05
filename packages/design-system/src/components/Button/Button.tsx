@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import './Button.css';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'accent';
+export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'accent';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

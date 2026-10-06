@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, fn } from 'storybook/test';
 import { Button } from './Button';
 import { figmaDesign } from '../../figma/links';
 
@@ -65,4 +66,23 @@ export const AllVariants: Story = {
       <Button variant="danger">Danger</Button>
     </div>
   ),
+};
+
+// Interaction tests: run by `npm run test:stories` locally and by Chromatic on every build.
+export const FiresOnClick: Story = {
+  args: { children: 'Check In Patient', onClick: fn() },
+  play: async ({ args, canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'Check In Patient' }));
+    await expect(args.onClick).toHaveBeenCalledOnce();
+  },
+};
+
+export const LoadingIgnoresClicks: Story = {
+  args: { children: 'Saving...', loading: true, onClick: fn() },
+  play: async ({ args, canvas, userEvent }) => {
+    const button = canvas.getByRole('button', { name: 'Saving...' });
+    await expect(button).toBeDisabled();
+    await userEvent.click(button);
+    await expect(args.onClick).not.toHaveBeenCalled();
+  },
 };

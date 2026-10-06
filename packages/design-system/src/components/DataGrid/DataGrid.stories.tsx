@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, within } from 'storybook/test';
 import { Badge } from '../Badge';
 import { Button } from '../Button';
 import { DataGrid } from './DataGrid';
@@ -114,4 +115,41 @@ export const Empty: Story = {
       ]}
     />
   ),
+};
+
+// Interaction tests: run by `npm run test:stories` locally and by Chromatic on every build.
+export const SearchFiltersRows: Story = {
+  ...ClaimsList,
+  play: async ({ canvas, userEvent }) => {
+    await expect(canvas.getByText('4 rows')).toBeInTheDocument();
+    await userEvent.type(canvas.getByPlaceholderText('Search claims, patients, payers…'), 'medicare');
+    await expect(canvas.getByText('1 rows')).toBeInTheDocument();
+    await expect(canvas.getByRole('cell', { name: 'Bob Johnson' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('cell', { name: 'Alice Smith' })).not.toBeInTheDocument();
+  },
+};
+
+export const SearchWithNoMatches: Story = {
+  ...ClaimsList,
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.type(canvas.getByPlaceholderText('Search claims, patients, payers…'), 'cigna');
+    await expect(canvas.getByText('0 rows')).toBeInTheDocument();
+    await expect(canvas.getByText('No rows match your filters.')).toBeInTheDocument();
+  },
+};
+
+export const SortsByAmount: Story = {
+  ...ClaimsList,
+  play: async ({ canvas, userEvent }) => {
+    const amount = canvas.getByRole('columnheader', { name: 'Amount' });
+    const firstPatient = () => within(canvas.getAllByRole('row')[1]).getAllByRole('cell')[1];
+
+    await userEvent.click(amount);
+    await expect(amount).toHaveAttribute('aria-sort', 'ascending');
+    await expect(firstPatient()).toHaveTextContent('Charlie Williams');
+
+    await userEvent.click(amount);
+    await expect(amount).toHaveAttribute('aria-sort', 'descending');
+    await expect(firstPatient()).toHaveTextContent('Bob Johnson');
+  },
 };

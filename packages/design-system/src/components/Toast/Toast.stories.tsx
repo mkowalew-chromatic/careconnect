@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, waitFor } from 'storybook/test';
 import { Button } from '../Button';
 import { ToastProvider, useToast, type ToastVariant } from './Toast';
 import { figmaDesign } from '../../figma/links';
@@ -36,4 +37,16 @@ export const Default: Story = {
 
 export const Error: Story = {
   render: () => <ToastTrigger variant="error" message="Claim rejected" />,
+};
+
+// Interaction test: toasts stack in the live region as they are pushed.
+export const StacksOnClick: Story = {
+  render: () => <ToastDemo />,
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.click(canvas.getByRole('button', { name: 'Success' }));
+    await expect(await canvas.findByRole('status')).toHaveTextContent('Patient checked in');
+    await userEvent.click(canvas.getByRole('button', { name: 'Error' }));
+    await waitFor(() => expect(canvas.getAllByRole('status')).toHaveLength(2));
+    await expect(canvas.getAllByRole('status')[1]).toHaveTextContent('Claim rejected');
+  },
 };

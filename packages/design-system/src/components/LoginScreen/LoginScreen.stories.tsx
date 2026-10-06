@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
+import { expect } from 'storybook/test';
 import { LoginScreen } from './LoginScreen';
 import { DESIGN_SYSTEM_VERSION } from '../..';
 import { figmaDesign } from '../../figma/links';
@@ -23,11 +24,19 @@ const meta: Meta<typeof LoginScreen> = {
 export default meta;
 type Story = StoryObj<typeof LoginScreen>;
 
-function LoginScreenDemo(props: Partial<ComponentProps<typeof LoginScreen>>) {
-  const [email, setEmail] = useState(props.email ?? 'demo.user@example.com');
-  const [password, setPassword] = useState(props.password ?? 'SampleDemoPass1!');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+// email, password, error and loading seed the demo's state rather than being
+// passed through, so the fields stay editable in every story.
+function LoginScreenDemo({
+  email: initialEmail = 'demo.user@example.com',
+  password: initialPassword = 'SampleDemoPass1!',
+  error: initialError = '',
+  loading: initialLoading = false,
+  ...props
+}: Partial<ComponentProps<typeof LoginScreen>>) {
+  const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState(initialPassword);
+  const [error, setError] = useState(initialError);
+  const [loading, setLoading] = useState(initialLoading);
 
   return (
     <LoginScreen
@@ -126,4 +135,39 @@ export const WithError: Story = {
 
 export const Loading: Story = {
   render: () => <LoginScreenDemo loading />,
+};
+
+// Interaction tests: run by `npm run test:stories` locally and by Chromatic on every build.
+export const EmptySubmitShowsError: Story = {
+  render: () => <LoginScreenDemo />,
+  play: async ({ canvas, userEvent }) => {
+    await userEvent.clear(canvas.getByLabelText('Email address'));
+    await userEvent.clear(canvas.getByLabelText('Password'));
+    await userEvent.click(canvas.getByRole('button', { name: /Sign In/ }));
+    await expect(await canvas.findByRole('alert', {}, { timeout: 3000 })).toHaveTextContent(
+      'Invalid username or password',
+    );
+  },
+};
+
+export const RevealsTypedPassword: Story = {
+  render: () => <LoginScreenDemo />,
+  play: async ({ canvas, userEvent }) => {
+    const password = canvas.getByLabelText('Password');
+    await userEvent.clear(password);
+    await userEvent.type(password, 'NewDemoPass2!');
+    await userEvent.click(canvas.getByRole('button', { name: 'Show password' }));
+    await expect(password).toHaveAttribute('type', 'text');
+    await expect(password).toHaveValue('NewDemoPass2!');
+  },
+};
+
+export const PortalEmailIsEditable: Story = {
+  ...Portal,
+  play: async ({ canvas, userEvent }) => {
+    const email = canvas.getByLabelText('Email address');
+    await userEvent.clear(email);
+    await userEvent.type(email, 'billing@example.com');
+    await expect(email).toHaveValue('billing@example.com');
+  },
 };

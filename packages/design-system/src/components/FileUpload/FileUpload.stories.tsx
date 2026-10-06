@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, fn } from 'storybook/test';
 import { FileUpload } from './FileUpload';
 import { figmaDesign } from '../../figma/links';
 
@@ -33,4 +34,28 @@ export const Active: Story = {
     accept: 'image/*,.pdf',
   },
   parameters: { pseudo: { hover: '.cc-file-upload__dropzone' } },
+};
+
+// Interaction tests: run by `npm run test:stories` locally and by Chromatic on every build.
+const insuranceCard = () => new File([new Uint8Array(2048)], 'insurance-card.png', { type: 'image/png' });
+
+export const SelectsAFile: Story = {
+  args: { ...InsuranceCard.args, onFilesSelected: fn() },
+  play: async ({ args, canvas, canvasElement, userEvent }) => {
+    const file = insuranceCard();
+    await userEvent.upload(canvasElement.querySelector<HTMLInputElement>('input[type="file"]')!, file);
+    await expect(args.onFilesSelected).toHaveBeenCalledOnce();
+    await expect(args.onFilesSelected).toHaveBeenCalledWith([file]);
+    await expect(canvas.getByText('insurance-card.png (2 KB)')).toBeInTheDocument();
+  },
+};
+
+export const ClearsSelection: Story = {
+  args: { ...InsuranceCard.args },
+  play: async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.upload(canvasElement.querySelector<HTMLInputElement>('input[type="file"]')!, insuranceCard());
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear' }));
+    await expect(canvas.queryByText('insurance-card.png (2 KB)')).not.toBeInTheDocument();
+    await expect(canvas.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
+  },
 };

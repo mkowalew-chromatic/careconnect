@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, fn } from 'storybook/test';
 import { Checkbox } from './Checkbox';
 import { figmaDesign } from '../../figma/links';
 
@@ -36,4 +37,16 @@ export const AllVariants: Story = {
       <Checkbox label="High-risk fall protocol" description="Trigger nursing assessment on check-in" />
     </div>
   ),
+};
+
+// Interaction test: the whole label row is the hit target, not just the box.
+export const TogglesFromLabel: Story = {
+  args: { label: 'Interpreter required', onChange: fn() },
+  play: async ({ args, canvas, userEvent }) => {
+    const checkbox = canvas.getByRole('checkbox', { name: 'Interpreter required' });
+    await expect(checkbox).not.toBeChecked();
+    await userEvent.click(canvas.getByText('Interpreter required'));
+    await expect(checkbox).toBeChecked();
+    await expect(args.onChange).toHaveBeenCalledOnce();
+  },
 };

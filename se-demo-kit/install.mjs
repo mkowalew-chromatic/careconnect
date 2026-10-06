@@ -1,0 +1,12 @@
+import { mkdirSync, copyFileSync, existsSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
+const kit = dirname(fileURLToPath(import.meta.url));
+const repo = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+const target = join(repo, 'packages/design-system/src/se-demo');
+if (!existsSync(join(repo, 'packages/design-system/chromatic.config.json'))) throw Error('Run inside a CareConnect checkout');
+if (existsSync(target)) throw Error('Fixture directory already exists; refusing to overwrite');
+mkdirSync(target);
+for (const name of ['Handoff','Confirmation','SharedAlert','FocusedFeedback','DesignSignoff','AccessibleAction']) copyFileSync(join(kit,'fixtures',name+'.stories.tsx'),join(target,name+'.stories.tsx'));
+console.log('Installed six new fixture files. Commit them on a dedicated baseline branch.');

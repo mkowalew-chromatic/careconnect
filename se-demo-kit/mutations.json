@@ -1,0 +1,32 @@
+{
+  "handoff": {
+    "path": "packages/design-system/src/se-demo/Handoff.stories.tsx",
+    "before": "visibility: visible;",
+    "after": "visibility: hidden;"
+  },
+  "confirmation": {
+    "path": "packages/design-system/src/se-demo/Confirmation.stories.tsx",
+    "before": "onConfirm={() => setConfirmed(true)}",
+    "after": "onConfirm={() => {}}"
+  },
+  "shared-alert": {
+    "path": "packages/design-system/src/components/Alert/Alert.css",
+    "before": "padding: var(--cc-space-4);",
+    "after": "padding: 32px;"
+  },
+  "focused-feedback": {
+    "path": "packages/design-system/src/se-demo/FocusedFeedback.stories.tsx",
+    "before": "padding: 16",
+    "after": "padding: 40"
+  },
+  "design-signoff": {
+    "path": "packages/design-system/src/se-demo/DesignSignoff.stories.tsx",
+    "before": "display: 'flex', gap: 8",
+    "after": "display: 'flex', gap: 32"
+  },
+  "accessible-action": {
+    "path": "packages/design-system/src/se-demo/AccessibleAction.stories.tsx",
+    "before": " aria-label=\"Dismiss demo notice\"",
+    "after": ""
+  }
+}

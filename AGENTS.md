@@ -137,3 +137,5 @@ produces the same diff.
 
 - Describe **what changed and why** in product or engineering terms only.
 - Do **not** mention IDE names, agent tools, or assistant products in commit messages, PR titles, or PR descriptions.
+- Do **not** add `Co-Authored-By` trailers, "Generated with …" lines, or session links for AI assistants. The only contributors to this repository are `mkowalew-chromatic` and `github-actions[bot]`. [.claude/settings.json](.claude/settings.json) turns off Claude Code's attribution; other tools need the same.
+- Commit with the `martin@chromatic.com` author email so commits link to `mkowalew-chromatic`.

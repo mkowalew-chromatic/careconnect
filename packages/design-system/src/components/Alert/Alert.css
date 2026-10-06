@@ -3,7 +3,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--cc-space-4);
-  padding: var(--cc-space-4);
+  padding: 32px;
   border-radius: var(--cc-radius-md);
   border: 1px solid transparent;
 }

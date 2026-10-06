@@ -11,31 +11,31 @@
 # and keep the rest of the file unchanged.
 
 # Catch-all: repo-wide tooling, root config, docs
-*                                   @martin-chromatic
+*                                   @mkowalew-chromatic
 
 # --- Backend team: API service and the API contract it publishes -----------
-apps/api/                           @martin-chromatic
-packages/types/                     @martin-chromatic
-packages/api-client/                @martin-chromatic
-packages/mock-data/                 @martin-chromatic
-deploy/systemd/                     @martin-chromatic
+apps/api/                           @mkowalew-chromatic
+packages/types/                     @mkowalew-chromatic
+packages/api-client/                @mkowalew-chromatic
+packages/mock-data/                 @mkowalew-chromatic
+deploy/systemd/                     @mkowalew-chromatic
 
 # --- EHR frontend team ------------------------------------------------------
-apps/ehr/                           @martin-chromatic
+apps/ehr/                           @mkowalew-chromatic
 
 # --- Portal frontend team ---------------------------------------------------
-apps/portal/                        @martin-chromatic
+apps/portal/                        @mkowalew-chromatic
 
 # --- Design system team -----------------------------------------------------
-packages/design-system/             @martin-chromatic
-.github/workflows/chromatic.yml     @martin-chromatic
+packages/design-system/             @mkowalew-chromatic
+.github/workflows/chromatic.yml     @mkowalew-chromatic
 
 # --- Platform / release engineering (cross-team; changes here affect everyone)
-.changeset/config.json              @martin-chromatic
-turbo.json                          @martin-chromatic
-package.json                        @martin-chromatic
-package-lock.json                   @martin-chromatic
-scripts/                            @martin-chromatic
-deploy/                             @martin-chromatic
-.github/                            @martin-chromatic
-apps/smoke-tests/                   @martin-chromatic
+.changeset/config.json              @mkowalew-chromatic
+turbo.json                          @mkowalew-chromatic
+package.json                        @mkowalew-chromatic
+package-lock.json                   @mkowalew-chromatic
+scripts/                            @mkowalew-chromatic
+deploy/                             @mkowalew-chromatic
+.github/                            @mkowalew-chromatic
+apps/smoke-tests/                   @mkowalew-chromatic

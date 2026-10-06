@@ -19,10 +19,6 @@ on:
   # Required checks must also report on merge-queue refs, or the queue stalls
   # waiting for a status that never arrives. Harmless when no queue is enabled.
   merge_group:
-  # chromatic-demo.yml opens its PRs with GITHUB_TOKEN, which never triggers
-  # pull_request runs, so it dispatches this workflow on each demo branch. The
-  # run checks out the branch head, so the statuses still land on the PR.
-  workflow_dispatch:
 
 # Cancel superseded PR runs — a new push to a PR makes the previous Chromatic
 # build irrelevant. Main runs are never cancelled: each one auto-accepts and

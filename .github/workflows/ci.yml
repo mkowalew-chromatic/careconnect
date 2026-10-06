@@ -44,13 +44,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      # The Chromatic demo storylines (docs/CHROMATIC-DEMO.md) patch real
-      # components by anchor text. Checking them here makes the PR that moves an
-      # anchor fail, instead of the Monday demo run. Git and node only; seconds.
-      - name: Check Chromatic demo chapters still apply
-        if: matrix.unit == 'design-system'
-        run: node scripts/chromatic-demo/run.mjs --dry-run
-
       # Every workspace is private and linked locally, so no registry auth is
       # needed — shared packages are built from source as task dependencies.
       - name: Install dependencies

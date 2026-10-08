@@ -98,6 +98,15 @@ just works on a fresh clone:
 npm run test:stories
 ```
 
+Multi-step flows and compositions that no single story renders live in
+`*.visual.test.tsx` files: plain Vitest tests in the same browser, where
+Chromatic snapshots every `takeSnapshot()` and the end of each test. See
+[CONTRIBUTING.md](./CONTRIBUTING.md#vitest-visual-tests).
+
+```bash
+npm run test:visual
+```
+
 `npm run ds:build` emits `dist/index.js`, `dist/careconnect-design-system.css`, and per-component type declarations. React and every runtime dependency are externalized, so consumers resolve a single shared copy from their own tree.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for component and versioning conventions.

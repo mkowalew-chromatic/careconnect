@@ -2,18 +2,20 @@
  * postinstall hook: download the Playwright browser the test suites need, so
  * `npm install` is the only setup step a new contributor runs.
  *
- * Two suites drive a real browser — `npm run test:stories` (the design
- * system's stories, via @vitest/browser-playwright) and `npm run smoke:test`
- * (apps/smoke-tests) — and both use chromium. npm does not fetch browser
+ * Three suites drive a real browser — `npm run test:stories` and
+ * `npm run test:visual` (the design system's stories and visual tests, via
+ * @vitest/browser-playwright) and `npm run smoke:test` (apps/smoke-tests) —
+ * and all use chromium. npm does not fetch browser
  * binaries with the packages, so without this they fail on a fresh clone with
  * `browserType.launch: Executable doesn't exist`.
  *
  * Deliberately skipped in three cases:
  *
  *   * CI — the workflows install a browser explicitly in the jobs that need
- *     one (the design-system CI job, deploy-environment.yml's smoke tests).
- *     Downloading it in the api/ehr/portal, release and Chromatic jobs would
- *     be ~150 MB of waste each.
+ *     one (the design-system CI job, the Chromatic Vitest job,
+ *     deploy-environment.yml's smoke tests). Downloading it in the
+ *     api/ehr/portal, release and Chromatic Storybook jobs would be ~150 MB
+ *     of waste each.
  *   * Production builds — deploy/build-production.sh sets the skip variable
  *     below. It runs `npm ci --include=dev` on the VM as the service user, and
  *     an API server has no use for a browser.

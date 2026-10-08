@@ -13,7 +13,7 @@ AI coding agents working in this repository should follow [AGENTS.md](../AGENTS.
 | `api` | `@careconnect/api` | Backend | Service | Tag, GitHub Release, and deploy (systemd restart with database migrations) |
 | `ehr` | `@careconnect/ehr` | EHR frontend | Frontend | Tag, GitHub Release, and deploy (static bundle, atomic symlink swap) |
 | `portal` | `@careconnect/portal` | Portal frontend | Frontend | Tag, GitHub Release, and deploy (static bundle, atomic symlink swap) |
-| `design-system` | `@careconnect/design-system` | Design system | Library | Tag, GitHub Release, and a new Storybook baseline on Chromatic |
+| `design-system` | `@careconnect/design-system` | Design system | Library | Tag, GitHub Release, and new Chromatic baselines (Storybook and Vitest visual tests) |
 
 The list is defined in [`scripts/release-units.mjs`](../scripts/release-units.mjs), and review ownership per unit is in [`.github/CODEOWNERS`](../.github/CODEOWNERS).
 
@@ -64,7 +64,7 @@ To preview what would ship, run `npm run release:notes`.
 
 ### 3. Open a pull request
 
-CODEOWNERS requests review from the owning team of every area you touched. The four unit jobs and the aggregate **All units passed** check must all be green. Design-system PRs also receive a Chromatic visual review ([`chromatic.yml`](../.github/workflows/chromatic.yml)).
+CODEOWNERS requests review from the owning team of every area you touched. The four unit jobs and the aggregate **All units passed** check must all be green. Design-system PRs also receive two Chromatic visual reviews, one for the Storybook and one for the Vitest visual tests ([`chromatic.yml`](../.github/workflows/chromatic.yml)). Their checks are named after each Chromatic project, for example `UI Tests: careconnect` and `UI Tests: CareConnect – Vitest`.
 
 ### 4. Merge to `main`
 
@@ -163,7 +163,14 @@ The VM itself is prepared once with the installer (see [deploy/DEPLOYMENT.md](..
 
 ### Chromatic
 
-Add the `CHROMATIC_PROJECT_TOKEN` repository secret. See [packages/design-system/CONTRIBUTING.md](../packages/design-system/CONTRIBUTING.md).
+Chromatic keeps Storybook builds and Vitest builds in separate projects, so the repository needs two, both linked to this repository:
+
+| Name | Kind | Notes |
+| --- | --- | --- |
+| `CHROMATIC_PROJECT_TOKEN` | repository secret | Token of the Storybook project. |
+| `CHROMATIC_VITEST_PROJECT_TOKEN` | repository secret | Token of the Vitest project. When adding it in Chromatic, choose this repository a second time and give the project a distinct name. |
+
+Each job skips until its secret is set. UI Review for a project only works once that project has a build on `main`: on the PR that first adds a project, its UI Review check stays pending, and the build after the merge sets the baseline. See [packages/design-system/CONTRIBUTING.md](../packages/design-system/CONTRIBUTING.md).
 
 ---
 
@@ -231,7 +238,7 @@ Scope by unit where it helps: `fix(portal): …`, `feat(api): …`.
 | [`.github/workflows/release.yml`](../.github/workflows/release.yml) | Version Packages PR, then tags, GitHub Releases, and deploy dispatch |
 | [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) | One unit, staging then production; also used for manual redeploys |
 | [`.github/workflows/deploy-environment.yml`](../.github/workflows/deploy-environment.yml) | Reusable workflow: build, ship, smoke-test, and roll back on failure for one environment |
-| [`.github/workflows/chromatic.yml`](../.github/workflows/chromatic.yml) | Storybook visual review on design-system PRs; auto-accepted baseline on `main` |
+| [`.github/workflows/chromatic.yml`](../.github/workflows/chromatic.yml) | Visual review on every PR, for the Storybook and the Vitest visual tests (separate Chromatic projects); auto-accepted baselines on `main` |
 | [`deploy/package-artifact.sh`](../deploy/package-artifact.sh) | Builds and packages one unit as `careconnect-<unit>-<version>-<sha>.tar.gz` |
 | [`deploy/deploy-artifact.sh`](../deploy/deploy-artifact.sh) · [`rollback.sh`](../deploy/rollback.sh) | On-VM deploy and rollback of one unit |
 | [`deploy/remote-deploy.sh`](../deploy/remote-deploy.sh) · [`remote-rollback.sh`](../deploy/remote-rollback.sh) · [`fetch-ci-artifact.sh`](../deploy/fetch-ci-artifact.sh) | Laptop- and CI-side wrappers |

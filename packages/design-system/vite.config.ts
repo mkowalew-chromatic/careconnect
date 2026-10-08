@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
+import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import dts from 'vite-plugin-dts';
 import path from 'path';
@@ -7,6 +8,7 @@ import pkg from './package.json' with { type: 'json' };
 import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
+import { chromaticPlugin } from '@chromatic-com/vitest/plugin';
 
 const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
@@ -54,6 +56,7 @@ export default defineConfig({
           environment: 'jsdom',
           setupFiles: ['./vitest.setup.ts'],
           include: ['src/**/*.test.{ts,tsx}'],
+          exclude: [...configDefaults.exclude, 'src/**/*.visual.test.tsx'],
         },
       },
       // Storybook Vitest integration — runs stories as tests.
@@ -67,6 +70,28 @@ export default defineConfig({
         ],
         test: {
           name: 'storybook',
+          browser: {
+            enabled: true,
+            headless: true,
+            provider: playwright({}),
+            instances: [{ browser: 'chromium' }],
+          },
+        },
+      },
+      // Visual tests — plain Vitest tests in a real browser. Chromatic's plugin
+      // archives the DOM at the end of each test (and at every takeSnapshot()),
+      // and `chromatic --vitest` uploads those archives as a separate Chromatic
+      // project. See: https://www.chromatic.com/docs/vitest/
+      {
+        extends: true,
+        plugins: [chromaticPlugin({ turboSnap: true })],
+        // The plugin's browser runtime uses top-level await, which Vite 6's
+        // dependency pre-bundler (ES2020 target) rejects; serve it as-is.
+        optimizeDeps: { exclude: ['@chromatic-com/vitest'] },
+        test: {
+          name: 'visual',
+          include: ['src/**/*.visual.test.tsx'],
+          setupFiles: ['./vitest.visual.setup.ts'],
           browser: {
             enabled: true,
             headless: true,

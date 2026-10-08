@@ -17,7 +17,7 @@ Four **release units**, each owned by its own team and released independently �
 | Local dev setup | `deploy/install.sh --local` → `./deploy/start-local.sh` |
 | Remote VM deploy | Fresh VM: `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env`. Installed VM: `./deploy/remote-install.sh --unit <api\|ehr\|portal\|all> --config …` ships the latest CI artifact (see [After a release](#after-a-release-deploy)) |
 | Build | `npm run build` (turbo; builds types + design system before the apps) |
-| Typecheck / tests | `npm run typecheck` (every TS workspace) · `npm test` (API + design system unit tests) · `npm run test:stories` (every design-system story as a browser test) · `npm run smoke:test` (Playwright, needs a running stack) |
+| Typecheck / tests | `npm run typecheck` (every TS workspace) · `npm test` (API + design system unit tests) · `npm run test:stories` (every design-system story as a browser test) · `npm run test:visual` (design-system `*.visual.test.tsx` flows in a browser, captured for Chromatic) · `npm run smoke:test` (Playwright, needs a running stack) |
 | Playwright browsers | Automatic — the root `postinstall` ([scripts/install-playwright-browsers.mjs](scripts/install-playwright-browsers.mjs)) fetches chromium for `test:stories` and `smoke:test`. By hand: `npx playwright install chromium`. Skipped when `CI` is set or `CARECONNECT_SKIP_PLAYWRIGHT_BROWSERS=1`; never fails the install. |
 | Component library / Storybook | `npm run storybook` → http://localhost:6006 |
 | Figma ↔ Storybook bridge | [docs/FIGMA.md](docs/FIGMA.md) — Figma URLs in `packages/design-system/src/figma/links.json`; after editing `tokens.css` run `npm run tokens:export --workspace=@careconnect/design-system` |
@@ -50,8 +50,8 @@ See [README.md](README.md), [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md).
 
 ### Release flow
 
-- CI: `.github/workflows/ci.yml` — one job per unit (`api`, `ehr`, `portal`, `design-system`); `turbo --affected` on PRs so only touched units do real work. The `design-system` job also runs `test:stories` in a real browser. Aggregate check **All units passed** is the branch-protection gate.
-- Visual review: `.github/workflows/chromatic.yml` — Storybook on **every** PR, auto-accepted baseline on `main`. Do not add a `paths:` filter to it: a filtered workflow never triggers, and a required check that never starts leaves the PR pending forever. TurboSnap (`onlyChanged: true`) is what makes the unfiltered runs cheap, and it needs the job's `fetch-depth: 0`. The `main` permalink is also what the Figma plugins (story.to.design, Storybook Connect) read — see [docs/FIGMA.md](docs/FIGMA.md).
+- CI: `.github/workflows/ci.yml` — one job per unit (`api`, `ehr`, `portal`, `design-system`); `turbo --affected` on PRs so only touched units do real work. The `design-system` job also runs `test:stories` and `test:visual` in a real browser. Aggregate check **All units passed** is the branch-protection gate.
+- Visual review: `.github/workflows/chromatic.yml` — Storybook on **every** PR, auto-accepted baseline on `main`. A second job uploads the Vitest visual tests (`vitest: true`) to a separate Chromatic project with its own token, `CHROMATIC_VITEST_PROJECT_TOKEN`; it follows the same rules. Do not add a `paths:` filter to it: a filtered workflow never triggers, and a required check that never starts leaves the PR pending forever. TurboSnap (`onlyChanged: true`) is what makes the unfiltered runs cheap, and it needs the job's `fetch-depth: 0`. The `main` permalink is also what the Figma plugins (story.to.design, Storybook Connect) read — see [docs/FIGMA.md](docs/FIGMA.md).
 - Merge queue: `ci.yml` and `chromatic.yml` both listen on `merge_group` and do not cancel in-progress runs on queued refs. Keep both properties on any workflow whose checks are required, or enabling GitHub's merge queue stalls it.
 - Release: `.github/workflows/release.yml` on push to `main` — opens/refreshes the **Version Packages** PR while changesets are pending; once it merges, tags every bumped package, creates a GitHub Release per release unit, and dispatches `deploy.yml` per deployable unit.
 - Deploy: `.github/workflows/deploy.yml` — one unit per run, staging → smoke tests → production (environment approval), rollback on smoke failure. Also run by hand for any tag.
@@ -75,7 +75,7 @@ Environment config files are gitignored — create them from `deploy/careconnect
 
 - [ ] Build passes (`npm run build`)
 - [ ] Typecheck and tests pass (`npm run typecheck`, `npm test`) — use the Node version in `.nvmrc`
-- [ ] Design-system changes: `npm run test:stories` passes too (CI runs it)
+- [ ] Design-system changes: `npm run test:stories` and `npm run test:visual` pass too (CI runs both)
 - [ ] Changeset added if user-facing — for the workspace(s) changed only
 - [ ] No manual version or CHANGELOG edits
 - [ ] API `/health` uses `APP_VERSION` from package.json (no hardcoded version)

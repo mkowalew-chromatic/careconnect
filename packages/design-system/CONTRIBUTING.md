@@ -87,12 +87,69 @@ If your team turns on GitHub's **merge queue**, the workflow already listens on
 `merge_group`, so the Chromatic checks report on queued refs too. Without that
 trigger a required check never arrives and the queue stalls.
 
-Chromatic needs one repository secret, added under **Settings → Secrets and
+### Vitest visual tests
+
+Stories snapshot one component state each. `*.visual.test.tsx` files are plain
+Vitest tests, run in a real browser, for everything a story can't hold: flows
+that click through several states, compositions of several components, and the
+same flow across themes and viewports. [Chromatic's Vitest
+plugin](https://www.chromatic.com/docs/vitest/) (the `visual` project in
+[vite.config.ts](vite.config.ts)) archives the DOM at the end of every test and
+at every `takeSnapshot()`, and Chromatic renders and diffs those archives like
+any other snapshot.
+
+```tsx
+import { configure, takeSnapshot } from '@chromatic-com/vitest';
+import { page } from 'vitest/browser';
+import { render } from 'vitest-browser-react';
+
+test('discharge a patient', async () => {
+  await page.viewport(375, 812);
+  const screen = await render(<DischargeScreen />, { wrapper: ToastProvider });
+  await takeSnapshot('in office');          // a named snapshot mid-test
+  await screen.getByRole('button', { name: 'Discharge' }).click();
+  await takeSnapshot('confirm dialog');
+  // ...and one more, automatically, when the test ends
+});
+
+describe('Windows high contrast', () => {
+  configure({ forcedColors: 'active' });    // emulated at capture time
+  // ...
+});
+```
+
+- Colocate component flows with the component
+  (`src/components/DataGrid/DataGrid.visual.test.tsx`); flows that span
+  components go in [`src/flows/`](src/flows/).
+- `npm run test:visual` runs them locally and writes the archives to
+  `.vitest/chromatic` (gitignored). Upload by hand with
+  `npx chromatic --vitest --project-token=<vitest project token>` from this
+  directory.
+- Render with `vitest-browser-react`, not `@testing-library/react`'s
+  `render` + an `afterEach(cleanup)`: the end-of-test snapshot runs in an
+  `afterEach`, and an earlier cleanup would leave it an empty page.
+  `vitest-browser-react` cleans up before the next render instead.
+- Assertions are real: CI runs the suite in the `design-system` job alongside
+  the story tests.
+
+The `vitest-visual` job in [chromatic.yml](../../.github/workflows/chromatic.yml)
+uploads them with `chromaui/action`'s `vitest: true`. Chromatic keeps Vitest
+builds in a **separate Chromatic project** from the Storybook one, so the job
+has its own token and its own baseline; everything else (unfiltered triggers,
+`merge_group`, TurboSnap, auto-accept on `main`) matches the Storybook job.
+TurboSnap uses Vite's module graph (`turboSnap: true` on the plugin), so a PR
+re-snapshots only the tests whose imports changed; a change under
+`src/styles/` or to the setup file forces a full run.
+
+### Secrets
+
+Chromatic needs these repository secrets, added under **Settings → Secrets and
 variables → Actions**:
 
 | Name | Kind | Notes |
 | --- | --- | --- |
-| `CHROMATIC_PROJECT_TOKEN` | repository secret | Until it is set, the job skips rather than failing red. |
+| `CHROMATIC_PROJECT_TOKEN` | repository secret | Storybook project. Until it is set, the Storybook job skips rather than failing red. |
+| `CHROMATIC_VITEST_PROJECT_TOKEN` | repository secret | Vitest project — create a second project in Chromatic linked to this repo. Until it is set, the Vitest job skips. |
 
 ## Figma
 
@@ -124,7 +181,7 @@ the contract for apps consuming the library at runtime, not for building it.
 ## Component conventions
 
 - One directory per component under `src/components/`, holding the component,
-  its `.css`, its `.stories.tsx`, and any `.test.tsx`.
+  its `.css`, its `.stories.tsx`, and any `.test.tsx` / `.visual.test.tsx`.
 - Export it from [`src/index.ts`](src/index.ts) — that barrel is the package's
   only public surface.
 - Style with the `--cc-*` design tokens from `src/styles/` rather than literal

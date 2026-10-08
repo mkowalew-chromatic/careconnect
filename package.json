@@ -24,6 +24,7 @@
     "storybook": "npm run storybook --workspace=@careconnect/design-system",
     "build-storybook": "npm run build-storybook --workspace=@careconnect/design-system",
     "test:stories": "npm run test:stories --workspace=@careconnect/design-system",
+    "test:visual": "npm run test:visual --workspace=@careconnect/design-system",
     "smoke:test": "npm run test --workspace=@careconnect/smoke-tests",
     "changeset": "changeset",
     "version-packages": "changeset version",

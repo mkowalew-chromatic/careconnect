@@ -48,6 +48,15 @@
         "test-results/**"
       ]
     },
+    "test:visual": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "test-results/**",
+        ".vitest/**"
+      ]
+    },
     "build-storybook": {
       "dependsOn": [
         "^build"

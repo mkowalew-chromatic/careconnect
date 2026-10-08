@@ -49,9 +49,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Stories run as real browser tests (play functions, a11y checks) — what
-      # Chromatic's pixel diff doesn't cover. Only the design system defines
-      # `test:stories`; for the other units turbo resolves it to a no-op, so the
+      # Stories and the *.visual.test.tsx flows run as real browser tests (play
+      # functions, assertions, a11y checks) — what Chromatic's pixel diff
+      # doesn't cover. Only the design system defines `test:stories` and
+      # `test:visual`; for the other units turbo resolves them to no-ops, so the
       # browser is installed only where it is used.
       - name: Install Playwright browser
         if: matrix.unit == 'design-system'
@@ -59,7 +60,7 @@ jobs:
 
       - name: Typecheck, test, build (${{ matrix.unit }})
         run: >
-          npx turbo run typecheck test test:stories build
+          npx turbo run typecheck test test:stories test:visual build
           --filter=@careconnect/${{ matrix.unit }}
           ${{ github.event_name == 'pull_request' && '--affected' || '' }}
 
@@ -68,7 +69,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: junit-design-system
-          # junit.xml from the unit suite, junit-stories.xml from the stories.
+          # junit.xml from the unit suite, junit-stories.xml / junit-visual.xml
+          # from the browser suites.
           path: packages/design-system/test-results/*.xml
           if-no-files-found: ignore
 

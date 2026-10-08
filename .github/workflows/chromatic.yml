@@ -86,3 +86,59 @@ jobs:
           # permalink showing the previous release. Matched against paths from
           # the repo root.
           externals: '{packages/design-system,apps/ehr,apps/portal}/package.json'
+
+  # Vitest visual tests (packages/design-system/src/**/*.visual.test.tsx): plain
+  # Vitest tests in a real browser, where every takeSnapshot() and the end of
+  # each test becomes a Chromatic snapshot — multi-step flows and compositions
+  # that no single story renders. Chromatic keeps these in their own project,
+  # so this job has its own token and skips until that secret is set.
+  vitest-visual:
+    name: Vitest visual tests
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_VITEST_PROJECT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # baseline selection and TurboSnap both read git history
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        if: env.CHROMATIC_PROJECT_TOKEN != ''
+        run: npm ci
+
+      - name: Install Playwright browser
+        if: env.CHROMATIC_PROJECT_TOKEN != ''
+        run: npx playwright install --with-deps chromium
+
+      # Writes the DOM archives to packages/design-system/.vitest/chromatic.
+      # Assertion failures are reported by CI / design-system; upload whatever
+      # was captured anyway so reviewers still see the snapshots.
+      - name: Run visual tests
+        if: env.CHROMATIC_PROJECT_TOKEN != ''
+        continue-on-error: true
+        run: npm run test:visual
+
+      - name: Publish to Chromatic
+        if: env.CHROMATIC_PROJECT_TOKEN != ''
+        uses: chromaui/action@v18
+        with:
+          projectToken: ${{ env.CHROMATIC_PROJECT_TOKEN }}
+          workingDir: packages/design-system
+          vitest: true
+          exitZeroOnChanges: true
+          autoAcceptChanges: ${{ github.event_name == 'push' }}
+          # TurboSnap from Vite's module graph (`turboSnap: true` on the plugin
+          # in vite.config.ts): only tests whose imports changed re-snapshot.
+          # The stylesheets and setup file are loaded outside any test's
+          # import graph, so a change to them forces a full run.
+          onlyChanged: true
+          externals: '{packages/design-system/src/styles/**,packages/design-system/vitest.visual.setup.ts}'

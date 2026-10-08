@@ -12,6 +12,9 @@ MANIFEST.json
 coverage/
 test-results/
 playwright-report/
+# Vitest browser mode: Chromatic's DOM archives, failure screenshots
+.vitest/
+.vitest-attachments/
 
 # Packed tarballs
 *.tgz

@@ -1,5 +1,13 @@
 # @careconnect/ehr
 
+## 1.0.6
+
+### Patch Changes
+
+- dac6ac2: Upgrade the web apps and the design system to React 19 (19.2.3, the version Expo SDK 57 bundles, so web and a future React Native app share one copy). The design system's `react` / `react-dom` peer range is now `^19.0.0`; consumers on React 18 must upgrade. No component API changes. `useId()` values now render as `_r_N_` instead of `:rN:`.
+- Updated dependencies [dac6ac2]
+  - @careconnect/design-system@0.5.0
+
 ## 1.0.5
 
 ### Patch Changes

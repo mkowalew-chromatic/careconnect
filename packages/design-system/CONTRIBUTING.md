@@ -7,7 +7,7 @@ library.
 
 ## Versioning
 
-The library is one of the repo's four independently released units, owned by
+The library is one of the repo's independently released units, owned by
 the design-system team (see [`.github/CODEOWNERS`](../../.github/CODEOWNERS)
 and [`scripts/release-units.mjs`](../../scripts/release-units.mjs)). It
 follows [Semantic Versioning](https://semver.org/) on its own timeline and

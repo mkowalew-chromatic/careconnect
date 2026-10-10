@@ -6,9 +6,9 @@ Human-oriented release details: [docs/RELEASE.md](docs/RELEASE.md).
 
 ## Project
 
-Healthcare EMR demo monorepo: API (Express + SQLite), EHR (includes role-gated Billing section), Portal, and the shared UI component library. UI components live here as the workspace package [`@careconnect/design-system`](packages/design-system) — change a component and its consumers in the same commit; there is no publish step.
+Healthcare EMR demo monorepo: API (Express + SQLite), EHR (includes role-gated Billing section), Portal (web), Portal mobile (Expo / React Native, [`apps/portal-mobile`](apps/portal-mobile)), and the shared UI component libraries. Web components live in the workspace package [`@careconnect/design-system`](packages/design-system), native ones in [`@careconnect/design-system-native`](packages/design-system-native) (same tokens; a test fails if they drift). Change a component and its consumers in the same commit; there is no publish step.
 
-Four **release units**, each owned by its own team and released independently — `api` (Backend), `ehr` (EHR frontend), `portal` (Portal frontend), `design-system` (Design system); see [scripts/release-units.mjs](scripts/release-units.mjs) and [.github/CODEOWNERS](.github/CODEOWNERS). The three deployable units ship separately to Ubuntu VMs: a portal release never restarts the API.
+Six **release units**, each owned by one team and released independently — `api` (Backend), `ehr` (EHR frontend), `portal` and `portal-mobile` (Portal frontend), `design-system` and `design-system-native` (Design system); see [scripts/release-units.mjs](scripts/release-units.mjs) and [.github/CODEOWNERS](.github/CODEOWNERS). The three deployable units (`api`, `ehr`, `portal`) ship separately to Ubuntu VMs: a portal release never restarts the API. `portal-mobile` is not deployed; its releases are a tag plus its Storybook in Chromatic.
 
 ## Standard workflows
 
@@ -20,6 +20,7 @@ Four **release units**, each owned by its own team and released independently �
 | Typecheck / tests | `npm run typecheck` (every TS workspace) · `npm test` (API + design system unit tests) · `npm run test:stories` (every design-system story as a browser test) · `npm run test:visual` (design-system `*.visual.test.tsx` flows in a browser, captured for Chromatic) · `npm run e2e:test` (Playwright end-to-end suite, needs a running stack; `smoke:test` runs its `@smoke` subset — see [apps/playwright-e2e/README.md](apps/playwright-e2e/README.md)) |
 | Playwright browsers | Automatic — the root `postinstall` ([scripts/install-playwright-browsers.mjs](scripts/install-playwright-browsers.mjs)) fetches chromium for `test:stories`, `test:visual` and `smoke:test`. By hand: `npx playwright install chromium`. Skipped when `CI` is set or `CARECONNECT_SKIP_PLAYWRIGHT_BROWSERS=1`; never fails the install. |
 | Component library / Storybook | `npm run storybook` → http://localhost:6006 |
+| Mobile app | `npm run dev --workspace=@careconnect/portal-mobile` (Expo; simulator needs Xcode / Android Studio) · `npm run storybook:ios` / `storybook:android` in that workspace for on-device Storybook · see [apps/portal-mobile/README.md](apps/portal-mobile/README.md) |
 | Figma ↔ Storybook bridge | [docs/FIGMA.md](docs/FIGMA.md) — Figma URLs in `packages/design-system/src/figma/links.json`; after editing `tokens.css` run `npm run tokens:export --workspace=@careconnect/design-system` |
 | Staff login | `admin@se-tools.net` / seeded demo password (ask a teammate) |
 | Billing role login | `billing@se-tools.net` (full access) or `manager@se-tools.net` (view-only) / same seeded password |
@@ -50,9 +51,10 @@ See [README.md](README.md), [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md).
 
 ### Release flow
 
-- CI: `.github/workflows/ci.yml` — one job per unit (`api`, `ehr`, `portal`, `design-system`); `turbo --affected` on PRs so only touched units do real work. The `design-system` job also runs `test:stories` and `test:visual` in a real browser. Aggregate check **All units passed** is the branch-protection gate.
+- CI: `.github/workflows/ci.yml` — one job per unit (`api`, `ehr`, `portal`, `portal-mobile`, `design-system`, `design-system-native`); `turbo --affected` on PRs so only touched units do real work. The `design-system` job also runs `test:stories` and `test:visual` in a real browser. Aggregate check **All units passed** is the branch-protection gate.
 - Visual review: `.github/workflows/chromatic.yml` — Storybook on **every** PR, auto-accepted baseline on `main`. A second job uploads the Vitest visual tests (`vitest: true`) to a separate Chromatic project with its own token, `CHROMATIC_VITEST_PROJECT_TOKEN`; it follows the same rules. Do not add a `paths:` filter to it: a filtered workflow never triggers, and a required check that never starts leaves the PR pending forever. TurboSnap (`onlyChanged: true`) is what makes the unfiltered runs cheap, and it needs the job's `fetch-depth: 0`. The `main` permalink is also what the Figma plugins (story.to.design, Storybook Connect) read — see [docs/FIGMA.md](docs/FIGMA.md).
-- Merge queue: `ci.yml` and `chromatic.yml` both listen on `merge_group` and do not cancel in-progress runs on queued refs. Keep both properties on any workflow whose checks are required, or enabling GitHub's merge queue stalls it.
+- Mobile visual review: `.github/workflows/chromatic-native.yml` — builds the `portal-mobile` Storybook app for iOS (macOS runner) and Android and uploads both to a separate Chromatic project with React Native enabled (`CHROMATIC_NATIVE_PROJECT_TOKEN`). Same rules as `chromatic.yml`: no `paths:` filter, auto-accept only on `main`. Chromatic has no TurboSnap for React Native, so the build jobs are skipped by `if:` unless `turbo ls --affected` lists `@careconnect/portal-mobile`. Animated components must render a fixed frame under `MotionProvider animate={false}` (set for captures) instead of being excluded from snapshots.
+- Merge queue: `ci.yml`, `chromatic.yml` and `chromatic-native.yml` all listen on `merge_group` and do not cancel in-progress runs on queued refs. Keep both properties on any workflow whose checks are required, or enabling GitHub's merge queue stalls it.
 - Release: `.github/workflows/release.yml` on push to `main` — opens/refreshes the **Version Packages** PR while changesets are pending; once it merges, tags every bumped package, creates a GitHub Release per release unit, and dispatches `deploy.yml` per deployable unit.
 - Deploy: `.github/workflows/deploy.yml` — one unit per run, staging → full Playwright end-to-end suite → production. The staging suite **is** the production approval: green promotes automatically, red rolls staging back and stops the release for a person to act on. Production runs only the `@smoke` tests. A production-only run skips the gate and waits for a reviewer on the `production-override` environment. Staging runs upload to a third Chromatic project (`CHROMATIC_PLAYWRIGHT_PROJECT_TOKEN`); visual diffs there never block a deploy. Also run by hand for any tag.
 - Manual fallback: `npm run version-packages`, then `npm run release:publish` (tags + GitHub Releases). See [docs/RELEASE.md](docs/RELEASE.md).
@@ -76,6 +78,7 @@ Environment config files are gitignored — create them from `deploy/careconnect
 - [ ] Build passes (`npm run build`)
 - [ ] Typecheck and tests pass (`npm run typecheck`, `npm test`) — use the Node version in `.nvmrc`
 - [ ] Design-system changes: `npm run test:stories` and `npm run test:visual` pass too (CI runs both)
+- [ ] Mobile / native design-system changes: `npm run build --workspace=@careconnect/portal-mobile` bundles both platforms, and new states have a story with fixed fixtures
 - [ ] Changeset added if user-facing — for the workspace(s) changed only
 - [ ] No manual version or CHANGELOG edits
 - [ ] API `/health` uses `APP_VERSION` from package.json (no hardcoded version)
@@ -84,7 +87,7 @@ Environment config files are gitignored — create them from `deploy/careconnect
 ## Code conventions
 
 - Minimize scope; match existing patterns in surrounding files.
-- Shared types in `@careconnect/types`; API client in `@careconnect/api-client`; UI components in `@careconnect/design-system` (add new components there, not in an app).
+- Shared types in `@careconnect/types`; API client in `@careconnect/api-client`; UI components in `@careconnect/design-system` (web) or `@careconnect/design-system-native` (React Native). Add new components there, not in an app.
 - Private monorepo — no workspace is published to a registry; "publish" means git tag + GitHub Release (+ deploy).
 - The per-app `*:dev` scripts bypass turbo: after changing `@careconnect/types` or the design system, rebuild it (`npm run build --workspace=@careconnect/types` / `npm run ds:build`) before the apps see the change. `deploy/install.sh --local` builds all three once.
 

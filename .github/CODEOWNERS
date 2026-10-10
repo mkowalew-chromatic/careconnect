@@ -25,10 +25,13 @@ apps/ehr/                           @mkowalew-chromatic
 
 # --- Portal frontend team ---------------------------------------------------
 apps/portal/                        @mkowalew-chromatic
+apps/portal-mobile/                 @mkowalew-chromatic
 
 # --- Design system team -----------------------------------------------------
 packages/design-system/             @mkowalew-chromatic
+packages/design-system-native/      @mkowalew-chromatic
 .github/workflows/chromatic.yml     @mkowalew-chromatic
+.github/workflows/chromatic-native.yml @mkowalew-chromatic
 
 # --- Platform / release engineering (cross-team; changes here affect everyone)
 .changeset/config.json              @mkowalew-chromatic

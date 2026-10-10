@@ -15,7 +15,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # One job per release unit so each team gets its own required status check
-# ("CI / api", "CI / ehr", "CI / portal", "CI / design-system"). On pull
+# ("CI / api", "CI / ehr", "CI / portal", "CI / portal-mobile",
+# "CI / design-system", "CI / design-system-native"). On pull
 # requests, `turbo --affected` limits each job to work that the PR actually
 # touches (directly, or through a shared package such as types or the design
 # system); unaffected jobs finish in seconds and still report green, so the
@@ -29,7 +30,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        unit: [api, ehr, portal, design-system]
+        # portal-mobile's `build` is a JS-only `expo export` for iOS and Android
+        # (proves both bundles resolve); native builds run in chromatic-native.yml.
+        unit: [api, ehr, portal, portal-mobile, design-system, design-system-native]
     env:
       # Base for `--affected` on PRs; ignored on pushes to main.
       TURBO_SCM_BASE: origin/${{ github.base_ref || 'main' }}

@@ -1,5 +1,5 @@
 /**
- * The four independently released units of this monorepo and the team that
+ * The independently released units of this monorepo and the team that
  * owns each. This is the single source of truth used by the release tooling
  * (GitHub Releases, deploy dispatch) and mirrored by .github/CODEOWNERS.
  *
@@ -33,11 +33,27 @@ export const RELEASE_UNITS = [
     deployable: true,
   },
   {
+    unit: 'portal-mobile',
+    name: '@careconnect/portal-mobile',
+    dir: 'apps/portal-mobile',
+    team: 'Portal frontend',
+    kind: 'mobile', // Expo app; released as tag + its Storybook in Chromatic, not deployed to a VM
+    deployable: false,
+  },
+  {
     unit: 'design-system',
     name: '@careconnect/design-system',
     dir: 'packages/design-system',
     team: 'Design system',
     kind: 'library', // consumed at HEAD by ehr/portal; released as tag + Storybook
+    deployable: false,
+  },
+  {
+    unit: 'design-system-native',
+    name: '@careconnect/design-system-native',
+    dir: 'packages/design-system-native',
+    team: 'Design system',
+    kind: 'library', // consumed at HEAD by portal-mobile; its stories ship in that app's Storybook
     deployable: false,
   },
 ];

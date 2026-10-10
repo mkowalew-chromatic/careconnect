@@ -104,14 +104,16 @@ case "${UNIT}" in
     # (Playwright for the smoke tests) from the machine doing the packaging.
     # npm needs every workspace's package.json present to resolve the
     # lockfile; the resulting node_modules/@careconnect/* symlinks are
-    # relative and survive tar.
+    # relative and survive tar. --workspace limits the install to the API's
+    # own dependency tree, so other units' packages (React, React Native and
+    # Expo for the mobile app) stay out of the server artifact.
     for manifest in "${PROJECT_ROOT}"/apps/*/package.json "${PROJECT_ROOT}"/packages/*/package.json; do
       rel="${manifest#"${PROJECT_ROOT}"/}"
       mkdir -p "${STAGE_DIR}/$(dirname "${rel}")"
       cp "${manifest}" "${STAGE_DIR}/${rel}"
     done
     echo "==> Installing production node_modules into the artifact..."
-    (cd "${STAGE_DIR}" && npm ci --omit=dev --ignore-scripts --no-audit --no-fund)
+    (cd "${STAGE_DIR}" && npm ci --omit=dev --ignore-scripts --no-audit --no-fund --workspace=@careconnect/api)
     ;;
   ehr|portal)
     mkdir -p "${STAGE_DIR}/${PKG_DIR}"

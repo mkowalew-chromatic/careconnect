@@ -128,8 +128,32 @@ jobs:
           echo "::error::Environment '${{ inputs.environment }}' needs the EHR_URL and PORTAL_URL variables for the end-to-end gate — see docs/RELEASE.md § One-time setup."
           exit 1
 
+      # The suite normally runs from the deployed ref, so the tests match the
+      # build. A ref cut before apps/playwright-e2e existed (an older tag being
+      # redeployed) has no suite, so run the one from the commit this workflow
+      # was dispatched from instead, in a separate worktree with its own
+      # install. The deployed checkout is left untouched.
+      - name: Locate end-to-end suite
+        id: suite
+        if: vars.EHR_URL != '' && vars.PORTAL_URL != ''
+        env:
+          REF: ${{ inputs.ref }}
+          SUITE_SHA: ${{ github.sha }}
+        run: |
+          if [ -f apps/playwright-e2e/package.json ]; then
+            echo "dir=${GITHUB_WORKSPACE}/apps/playwright-e2e" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::notice::${REF} predates apps/playwright-e2e — running the end-to-end suite from ${SUITE_SHA} instead."
+          suite_root="${RUNNER_TEMP}/e2e-suite"
+          git worktree remove --force "$suite_root" 2>/dev/null || true
+          git worktree add --detach "$suite_root" "$SUITE_SHA"
+          (cd "$suite_root" && npm ci --workspace=@careconnect/playwright-e2e)
+          echo "dir=${suite_root}/apps/playwright-e2e" >> "$GITHUB_OUTPUT"
+
       - name: Install Playwright browsers
         if: vars.EHR_URL != '' && vars.PORTAL_URL != ''
+        working-directory: ${{ steps.suite.outputs.dir }}
         run: npx playwright install --with-deps chromium
 
       # DEPLOY_UNIT / DEPLOY_VERSION let the suite check that the build it
@@ -137,7 +161,7 @@ jobs:
       - name: End-to-end tests (${{ inputs.suite }})
         id: e2e
         if: vars.EHR_URL != '' && vars.PORTAL_URL != ''
-        working-directory: apps/playwright-e2e
+        working-directory: ${{ steps.suite.outputs.dir }}
         env:
           EHR_URL: ${{ vars.EHR_URL }}
           PORTAL_URL: ${{ vars.PORTAL_URL }}
@@ -145,7 +169,7 @@ jobs:
           DEPLOY_UNIT: ${{ inputs.unit }}
           CHROMATIC_SNAPSHOTS: ${{ inputs.suite == 'full' && 'on' || 'off' }}
         run: |
-          export DEPLOY_VERSION="$(node -p "require('../${DEPLOY_UNIT}/package.json').version")"
+          export DEPLOY_VERSION="$(node -p "require('${GITHUB_WORKSPACE}/apps/${DEPLOY_UNIT}/package.json').version")"
           if [ "${{ inputs.suite }}" = "full" ]; then npm test; else npm run test:smoke; fi
 
       - name: Upload end-to-end test report
@@ -154,8 +178,8 @@ jobs:
         with:
           name: e2e-report-${{ inputs.unit }}-${{ inputs.environment }}
           path: |
-            apps/playwright-e2e/playwright-report
-            apps/playwright-e2e/test-results
+            ${{ steps.suite.outputs.dir }}/playwright-report
+            ${{ steps.suite.outputs.dir }}/test-results
           if-no-files-found: ignore
 
       # Visual review of the staging run, in its own Chromatic project. Runs
@@ -172,7 +196,7 @@ jobs:
       - name: Publish end-to-end snapshots to Chromatic
         if: always() && inputs.suite == 'full' && steps.e2e.outcome != 'skipped'
         continue-on-error: true
-        working-directory: apps/playwright-e2e
+        working-directory: ${{ steps.suite.outputs.dir }}
         env:
           CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PLAYWRIGHT_PROJECT_TOKEN }}
           CHROMATIC_BRANCH: ${{ inputs.environment }}
@@ -181,7 +205,7 @@ jobs:
             echo "::notice::CHROMATIC_PLAYWRIGHT_PROJECT_TOKEN is not set — skipping the Chromatic upload."
             exit 0
           fi
-          export CHROMATIC_SHA="$(git rev-parse HEAD)"
+          export CHROMATIC_SHA="$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)"
           npm run chromatic -- --exit-zero-on-changes --auto-accept-changes
 
       # Only roll back what this run deployed: a test failure after a
@@ -212,6 +236,8 @@ jobs:
             echo "3. Shipping without a green gate needs **Deploy** with \`environments = production\`, which waits for approval on the \`production-override\` environment."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Remove config and key
+      - name: Remove config, key and suite worktree
         if: always()
-        run: rm -f "$DEPLOY_CONFIG_FILE" "$SSH_KEY"
+        run: |
+          rm -f "$DEPLOY_CONFIG_FILE" "$SSH_KEY"
+          git worktree remove --force "${RUNNER_TEMP}/e2e-suite" 2>/dev/null || true

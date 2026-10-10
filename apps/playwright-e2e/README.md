@@ -1,6 +1,6 @@
 # End-to-end tests
 
-Playwright tests for a deployed CareConnect stack: the EHR, the Portal, and the API behind them. They are the gate between staging and production. [`deploy-environment.yml`](../../.github/workflows/deploy-environment.yml) runs the whole suite against staging after every deploy, and production is deployed only if it passes. After the production deploy, only the tests tagged `@smoke` run. See [docs/RELEASE.md § Deploy pipeline](../../docs/RELEASE.md#deploy-pipeline-per-unit).
+Playwright tests for a deployed CareConnect stack: the EHR, the Portal, and the API behind them. They are the gate between staging and production. [`deploy-environment.yml`](../../.github/workflows/deploy-environment.yml) runs the whole suite against staging after every deploy, and production is deployed only if it passes. After the production deploy, only the tests tagged `@smoke` run. The tests come from the ref being deployed, so they always match the build. Tags cut before this suite existed have no copy of it, so redeploying one of them runs the suite from `main` instead. See [docs/RELEASE.md § Deploy pipeline](../../docs/RELEASE.md#deploy-pipeline-per-unit).
 
 ## Running
 

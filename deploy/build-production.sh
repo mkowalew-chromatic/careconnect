@@ -57,9 +57,12 @@ fi
 
 # turbo builds each unit's workspace dependencies first (types, design system).
 if [[ "${UNIT}" == "all" ]]; then
-  echo "==> Building every unit (types + design-system -> api/ehr/portal, via turbo)..."
+  echo "==> Building every deployable unit (types + design-system -> api/ehr/portal, via turbo)..."
   echo "    EHR base: ${VITE_EHR_BASE} · Portal base: ${VITE_PORTAL_BASE}"
-  NODE_ENV=production npx turbo run build
+  # Only what ships to a VM: the mobile app (portal-mobile) is released as a
+  # tag and its Storybook build, never deployed here.
+  NODE_ENV=production npx turbo run build \
+    --filter=@careconnect/api --filter=@careconnect/ehr --filter=@careconnect/portal
   EXPECTED=(
     packages/types/dist/index.js
     packages/design-system/dist/index.js

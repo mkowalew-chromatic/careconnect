@@ -5,7 +5,7 @@
 
 CareConnect is a demo electronic medical record system for outpatient clinics. It is modeled on [Ottehr](https://github.com/masslight/ottehr) but built on its own component library rather than Material UI. The reference deployment runs on **se-tools.net**; you can also run it on a laptop or a single Ubuntu VM.
 
-The repository contains four pieces: a REST **API**, a staff-facing **EHR**, a **Patient Portal**, and the **design system** both frontends are built from. They share one monorepo so that a component change and the application code that uses it land in the same commit. Each piece is nonetheless owned by its own team and is versioned, tagged, released, and deployed independently; see [Versioning & Releases](#versioning--releases).
+The repository contains a REST **API**, a staff-facing **EHR**, a **Patient Portal** for the web and a **React Native** version of it for iOS and Android, and the two **design systems** they are built from (web and native, sharing one set of tokens). They share one monorepo so that a component change and the application code that uses it land in the same commit. Each piece is nonetheless owned by its own team and is versioned, tagged, released, and deployed independently; see [Versioning & Releases](#versioning--releases).
 
 To find the current version of any piece, check [GitHub Releases](https://github.com/mkowalew-chromatic/careconnect/releases) (tags follow the pattern `@careconnect/<unit>@<version>`) or the `CHANGELOG.md` in that piece's directory. The release process is documented in [docs/RELEASE.md](docs/RELEASE.md).
 
@@ -22,6 +22,7 @@ To find the current version of any piece, check [GitHub Releases](https://github
 - [Quick Start (Development)](#quick-start-development)
 - [Project Structure](#project-structure)
 - [Design System](#design-system)
+- [Mobile app](#mobile-app)
 - [Deployment](#deployment)
 - [Versioning & Releases](#versioning--releases)
 - [License](#license)
@@ -75,6 +76,7 @@ On a production VM, nginx serves the static frontend builds and proxies `/api/` 
 | `@careconnect/api-client` | Fetch wrapper and WebRTC helper used by the frontends |
 | `@careconnect/mock-data` | Legacy static data; the API has replaced it in most flows |
 | `@careconnect/design-system` | UI components, design tokens, and Storybook (see [Design System](#design-system)) |
+| `@careconnect/design-system-native` | React Native components on the same tokens (see [Mobile app](#mobile-app)) |
 
 ---
 
@@ -232,9 +234,11 @@ careconnect/
 │   ├── api/              # Express REST API + SQLite
 │   ├── ehr/              # Staff EHR (React + Vite; includes role-gated billing)
 │   ├── portal/           # Patient portal (React + Vite)
+│   ├── portal-mobile/    # Patient portal for iOS + Android (Expo / React Native) + on-device Storybook
 │   └── playwright-e2e/   # Playwright end-to-end tests against a running stack
 ├── packages/
 │   ├── design-system/    # UI component library + Storybook
+│   ├── design-system-native/ # React Native components on the same tokens
 │   ├── types/            # Shared types + questionnaire schemas
 │   ├── api-client/       # API client + WebRTC helper
 │   └── mock-data/        # Legacy static demo data
@@ -246,12 +250,12 @@ careconnect/
 │   ├── update.sh         # Rebuild every unit from source on the VM
 │   └── DEPLOYMENT.md     # Full deployment guide
 ├── scripts/
-│   ├── release-units.mjs # The four release units and their owning teams
+│   ├── release-units.mjs # The release units and their owning teams
 │   └── github-releases.mjs
 ├── .changeset/           # Pending changesets + config (independent versioning)
 ├── .github/
 │   ├── CODEOWNERS        # Per-unit review ownership
-│   └── workflows/        # ci (per unit), release, deploy, chromatic
+│   └── workflows/        # ci (per unit), release, deploy, chromatic, chromatic-native
 ├── package.json
 └── turbo.json
 ```
@@ -286,6 +290,20 @@ Because npm links the workspace locally, `npm run build` builds the library befo
 
 ---
 
+## Mobile app
+
+[`apps/portal-mobile`](apps/portal-mobile) is the patient portal as an [Expo](https://expo.dev) (React Native) app for iOS and Android. It talks to the same API through `@careconnect/api-client` and is built from [`@careconnect/design-system-native`](packages/design-system-native), whose tokens mirror the web design system's `tokens.css` (a unit test fails if they drift). The first version covers sign-in, home, visits (list, detail, check-in, cancel), secure messages (inbox, thread, reply), and the full booking flow from visit details to confirmation.
+
+```bash
+npm run api:dev                                            # API on :5000
+npm run dev --workspace=@careconnect/portal-mobile         # Expo dev server; press i / a for a simulator
+npm run storybook --workspace=@careconnect/portal-mobile   # same app, showing Storybook instead
+```
+
+Running on a simulator needs Xcode (iOS) or Android Studio (Android); the bundle itself builds anywhere (`npm run build --workspace=@careconnect/portal-mobile`). Set `EXPO_PUBLIC_API_URL` to point a device at a deployed API. Details, including how the Storybook build is captured by Chromatic, are in [apps/portal-mobile/README.md](apps/portal-mobile/README.md).
+
+---
+
 ## Deployment
 
 There are three ways to deploy CareConnect:
@@ -314,20 +332,22 @@ From your laptop:
 
 ## Versioning & Releases
 
-CareConnect follows [Semantic Versioning](https://semver.org/) and manages versions with [Changesets](https://github.com/changesets/changesets). There are four release units, one per team, and each is versioned, tagged, released, and deployed independently:
+CareConnect follows [Semantic Versioning](https://semver.org/) and manages versions with [Changesets](https://github.com/changesets/changesets). There are six release units, each owned by one team, and each is versioned, tagged, released, and (where deployable) deployed independently:
 
 | Unit | Team | Changelog | Tag / GitHub Release | Deployed as |
 |---|---|---|---|---|
 | `@careconnect/api` | Backend | [apps/api/CHANGELOG.md](apps/api/CHANGELOG.md) | `@careconnect/api@X.Y.Z` | systemd service plus database migrations |
 | `@careconnect/ehr` | EHR frontend | [apps/ehr/CHANGELOG.md](apps/ehr/CHANGELOG.md) | `@careconnect/ehr@X.Y.Z` | Static bundle behind nginx |
 | `@careconnect/portal` | Portal frontend | [apps/portal/CHANGELOG.md](apps/portal/CHANGELOG.md) | `@careconnect/portal@X.Y.Z` | Static bundle behind nginx |
+| `@careconnect/portal-mobile` | Portal frontend | [apps/portal-mobile/CHANGELOG.md](apps/portal-mobile/CHANGELOG.md) | `@careconnect/portal-mobile@X.Y.Z` | Not deployed to a VM; its Storybook app is captured by Chromatic on iOS and Android. App-store distribution is not set up yet |
 | `@careconnect/design-system` | Design system | [packages/design-system/CHANGELOG.md](packages/design-system/CHANGELOG.md) | `@careconnect/design-system@X.Y.Z` | Not deployed; the apps consume it at HEAD, Storybook is published through Chromatic, and the Figma library is generated from it ([docs/FIGMA.md](docs/FIGMA.md)) |
+| `@careconnect/design-system-native` | Design system | [packages/design-system-native/CHANGELOG.md](packages/design-system-native/CHANGELOG.md) | `@careconnect/design-system-native@X.Y.Z` | Not deployed; `portal-mobile` consumes it at HEAD and its stories ship in that app's Storybook |
 
 The shared packages (`types`, `api-client`, `mock-data`) are versioned independently as well, but they ship inside the units that use them, and bumping one automatically patch-bumps its dependents. The root [CHANGELOG.md](CHANGELOG.md) indexes the per-unit changelogs and preserves the pre-monorepo history.
 
 **Contributing a change.** After making a user-facing change, run `npm run changeset`, select only the workspaces you touched, and commit the generated file with your pull request. Review ownership for each unit is defined in [.github/CODEOWNERS](.github/CODEOWNERS).
 
-**Pipeline.** `ci.yml` runs one job per unit on every pull request; only the units the PR touches do real work. The design-system job also runs every story and every `*.visual.test.tsx` flow as a browser test. `chromatic.yml` runs on every pull request too, with two jobs: one publishes the Storybook, the other uploads the Vitest visual tests to a second Chromatic project. The workflow deliberately has no `paths:` filter, so its checks can safely be required in branch protection: a workflow held back by a path filter never starts, and a required check that never starts blocks the pull request forever. TurboSnap keeps that cheap by snapshotting only the stories and tests a commit actually affects. Both workflows also listen on `merge_group`, so their checks still report if you turn on GitHub's merge queue. On merge to `main`, `release.yml` opens or refreshes a **Version Packages** pull request. When that PR merges, the workflow tags each bumped package, creates a GitHub Release for each release unit, and dispatches `deploy.yml` for each deployable unit (staging, then the end-to-end gate, then production). Details, the one-time GitHub setup, and manual fallbacks are in [docs/RELEASE.md](docs/RELEASE.md).
+**Pipeline.** `ci.yml` runs one job per unit on every pull request; only the units the PR touches do real work. The design-system job also runs every story and every `*.visual.test.tsx` flow as a browser test. `chromatic.yml` runs on every pull request too, with two jobs: one publishes the Storybook, the other uploads the Vitest visual tests to a second Chromatic project. The workflow deliberately has no `paths:` filter, so its checks can safely be required in branch protection: a workflow held back by a path filter never starts, and a required check that never starts blocks the pull request forever. TurboSnap keeps that cheap by snapshotting only the stories and tests a commit actually affects. `chromatic-native.yml` builds the mobile Storybook for iOS (macOS runner) and Android and uploads both to a third Chromatic project; Chromatic has no TurboSnap for React Native yet, so its build jobs are skipped by an `if:` unless turbo reports the mobile app as affected. All of these workflows also listen on `merge_group`, so their checks still report if you turn on GitHub's merge queue. On merge to `main`, `release.yml` opens or refreshes a **Version Packages** pull request. When that PR merges, the workflow tags each bumped package, creates a GitHub Release for each release unit, and dispatches `deploy.yml` for each deployable unit (staging, then the end-to-end gate, then production). Details, the one-time GitHub setup, and manual fallbacks are in [docs/RELEASE.md](docs/RELEASE.md).
 
 AI coding agents working in this repository should follow [AGENTS.md](AGENTS.md).
 

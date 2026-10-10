@@ -1,6 +1,6 @@
 # Release Process
 
-CareConnect is a single monorepo containing four independently released units, one per team. Each unit has its own semantic version, changelog, git tag, and GitHub Release, and the deployable units each have their own deploy pipeline. Nothing is published to a package registry. A "release" means a tag and a GitHub Release, plus a deploy for `api`, `ehr`, and `portal`.
+CareConnect is a single monorepo containing six independently released units, each owned by one team. Each unit has its own semantic version, changelog, git tag, and GitHub Release, and the deployable units each have their own deploy pipeline. Nothing is published to a package registry. A "release" means a tag and a GitHub Release, plus a deploy for `api`, `ehr`, and `portal`.
 
 AI coding agents working in this repository should follow [AGENTS.md](../AGENTS.md).
 
@@ -13,7 +13,9 @@ AI coding agents working in this repository should follow [AGENTS.md](../AGENTS.
 | `api` | `@careconnect/api` | Backend | Service | Tag, GitHub Release, and deploy (systemd restart with database migrations) |
 | `ehr` | `@careconnect/ehr` | EHR frontend | Frontend | Tag, GitHub Release, and deploy (static bundle, atomic symlink swap) |
 | `portal` | `@careconnect/portal` | Portal frontend | Frontend | Tag, GitHub Release, and deploy (static bundle, atomic symlink swap) |
+| `portal-mobile` | `@careconnect/portal-mobile` | Portal frontend | Mobile | Tag, GitHub Release, and new Chromatic baselines (React Native Storybook on iOS and Android); not deployed |
 | `design-system` | `@careconnect/design-system` | Design system | Library | Tag, GitHub Release, and new Chromatic baselines (Storybook and Vitest visual tests) |
+| `design-system-native` | `@careconnect/design-system-native` | Design system | Library | Tag, GitHub Release, and new Chromatic baselines (its stories ship in the `portal-mobile` Storybook) |
 
 The list is defined in [`scripts/release-units.mjs`](../scripts/release-units.mjs), and review ownership per unit is in [`.github/CODEOWNERS`](../.github/CODEOWNERS).
 
@@ -64,7 +66,7 @@ To preview what would ship, run `npm run release:notes`.
 
 ### 3. Open a pull request
 
-CODEOWNERS requests review from the owning team of every area you touched. The four unit jobs and the aggregate **All units passed** check must all be green. Design-system PRs also receive two Chromatic visual reviews, one for the Storybook and one for the Vitest visual tests ([`chromatic.yml`](../.github/workflows/chromatic.yml)). Their checks are named after each Chromatic project, for example `UI Tests: careconnect` and `UI Tests: CareConnect – Vitest`.
+CODEOWNERS requests review from the owning team of every area you touched. The unit jobs and the aggregate **All units passed** check must all be green. Design-system PRs also receive two Chromatic visual reviews, one for the Storybook and one for the Vitest visual tests ([`chromatic.yml`](../.github/workflows/chromatic.yml)). PRs that affect `portal-mobile` (directly, or through `design-system-native`, `api-client` or `types`) receive a third, for the React Native Storybook on iOS and Android ([`chromatic-native.yml`](../.github/workflows/chromatic-native.yml)). Their checks are named after each Chromatic project, for example `UI Tests: careconnect` and `UI Tests: CareConnect – Vitest`.
 
 ### 4. Merge to `main`
 
@@ -241,7 +243,7 @@ Scope by unit where it helps: `fix(portal): …`, `feat(api): …`.
 | File | Purpose |
 |------|---------|
 | [`.changeset/config.json`](../.changeset/config.json) | Independent versioning; private packages are versioned and tagged; dependents are always patch-bumped; playwright-e2e are ignored |
-| [`scripts/release-units.mjs`](../scripts/release-units.mjs) | The four release units with their teams and kinds; used by the release tooling |
+| [`scripts/release-units.mjs`](../scripts/release-units.mjs) | The release units with their teams and kinds; used by the release tooling |
 | [`scripts/github-releases.mjs`](../scripts/github-releases.mjs) | Creates a GitHub Release for each tagged release unit from its CHANGELOG section; idempotent |
 | [`scripts/release-publish.sh`](../scripts/release-publish.sh) | Manual fallback: tag, push tags, and create releases |
 | [`.github/CODEOWNERS`](../.github/CODEOWNERS) | Review ownership per unit and shared package |

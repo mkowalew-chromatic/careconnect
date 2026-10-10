@@ -1,6 +1,13 @@
 import type { AuthUser } from '@careconnect/types';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
+// `import.meta.env` is Vite's; under React Native's import.meta polyfill it is
+// undefined, and the native app sets an absolute base with configureApiBase().
+let API_BASE = import.meta.env?.VITE_API_URL ?? '/api';
+
+/** Point the client at an absolute API origin (e.g. `https://host/api`) where `/api` doesn't resolve. */
+export function configureApiBase(url: string) {
+  API_BASE = url.replace(/\/$/, '');
+}
 
 let storageKey = 'cc_token';
 let authToken: string | null = typeof localStorage !== 'undefined' ? localStorage.getItem(storageKey) : null;

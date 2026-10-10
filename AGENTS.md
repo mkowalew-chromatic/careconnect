@@ -17,7 +17,7 @@ Four **release units**, each owned by its own team and released independently �
 | Local dev setup | `deploy/install.sh --local` → `./deploy/start-local.sh` |
 | Remote VM deploy | Fresh VM: `./deploy/remote-install.sh --build-from-source --config deploy/<environment>.env`. Installed VM: `./deploy/remote-install.sh --unit <api\|ehr\|portal\|all> --config …` ships the latest CI artifact (see [After a release](#after-a-release-deploy)) |
 | Build | `npm run build` (turbo; builds types + design system before the apps) |
-| Typecheck / tests | `npm run typecheck` (every TS workspace) · `npm test` (API + design system unit tests) · `npm run test:stories` (every design-system story as a browser test) · `npm run test:visual` (design-system `*.visual.test.tsx` flows in a browser, captured for Chromatic) · `npm run smoke:test` (Playwright, needs a running stack) |
+| Typecheck / tests | `npm run typecheck` (every TS workspace) · `npm test` (API + design system unit tests) · `npm run test:stories` (every design-system story as a browser test) · `npm run test:visual` (design-system `*.visual.test.tsx` flows in a browser, captured for Chromatic) · `npm run e2e:test` (Playwright end-to-end suite, needs a running stack; `smoke:test` runs its `@smoke` subset — see [apps/playwright-e2e/README.md](apps/playwright-e2e/README.md)) |
 | Playwright browsers | Automatic — the root `postinstall` ([scripts/install-playwright-browsers.mjs](scripts/install-playwright-browsers.mjs)) fetches chromium for `test:stories`, `test:visual` and `smoke:test`. By hand: `npx playwright install chromium`. Skipped when `CI` is set or `CARECONNECT_SKIP_PLAYWRIGHT_BROWSERS=1`; never fails the install. |
 | Component library / Storybook | `npm run storybook` → http://localhost:6006 |
 | Figma ↔ Storybook bridge | [docs/FIGMA.md](docs/FIGMA.md) — Figma URLs in `packages/design-system/src/figma/links.json`; after editing `tokens.css` run `npm run tokens:export --workspace=@careconnect/design-system` |
@@ -28,7 +28,7 @@ See [README.md](README.md), [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md).
 
 ## Versioning & releases (required)
 
-**SemVer** via **Changesets**, **independent per workspace** ([.changeset/config.json](.changeset/config.json) — no fixed group). Each release unit has its own version, `CHANGELOG.md`, git tag (`@careconnect/<name>@<version>`) and GitHub Release. Shared packages (`types`, `api-client`, `mock-data`) version independently too; when one bumps, its dependents are patch-bumped automatically (`updateInternalDependents: always`). `@careconnect/smoke-tests` is ignored by Changesets.
+**SemVer** via **Changesets**, **independent per workspace** ([.changeset/config.json](.changeset/config.json) — no fixed group). Each release unit has its own version, `CHANGELOG.md`, git tag (`@careconnect/<name>@<version>`) and GitHub Release. Shared packages (`types`, `api-client`, `mock-data`) version independently too; when one bumps, its dependents are patch-bumped automatically (`updateInternalDependents: always`). `@careconnect/playwright-e2e` is ignored by Changesets.
 
 ### When implementing changes
 
@@ -54,7 +54,7 @@ See [README.md](README.md), [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md).
 - Visual review: `.github/workflows/chromatic.yml` — Storybook on **every** PR, auto-accepted baseline on `main`. A second job uploads the Vitest visual tests (`vitest: true`) to a separate Chromatic project with its own token, `CHROMATIC_VITEST_PROJECT_TOKEN`; it follows the same rules. Do not add a `paths:` filter to it: a filtered workflow never triggers, and a required check that never starts leaves the PR pending forever. TurboSnap (`onlyChanged: true`) is what makes the unfiltered runs cheap, and it needs the job's `fetch-depth: 0`. The `main` permalink is also what the Figma plugins (story.to.design, Storybook Connect) read — see [docs/FIGMA.md](docs/FIGMA.md).
 - Merge queue: `ci.yml` and `chromatic.yml` both listen on `merge_group` and do not cancel in-progress runs on queued refs. Keep both properties on any workflow whose checks are required, or enabling GitHub's merge queue stalls it.
 - Release: `.github/workflows/release.yml` on push to `main` — opens/refreshes the **Version Packages** PR while changesets are pending; once it merges, tags every bumped package, creates a GitHub Release per release unit, and dispatches `deploy.yml` per deployable unit.
-- Deploy: `.github/workflows/deploy.yml` — one unit per run, staging → smoke tests → production (environment approval), rollback on smoke failure. Also run by hand for any tag.
+- Deploy: `.github/workflows/deploy.yml` — one unit per run, staging → full Playwright end-to-end suite → production. The staging suite **is** the production approval: green promotes automatically, red rolls staging back and stops the release for a person to act on. Production runs only the `@smoke` tests. A production-only run skips the gate and waits for a reviewer on the `production-override` environment. Staging runs upload to a third Chromatic project (`CHROMATIC_PLAYWRIGHT_PROJECT_TOKEN`); visual diffs there never block a deploy. Also run by hand for any tag.
 - Manual fallback: `npm run version-packages`, then `npm run release:publish` (tags + GitHub Releases). See [docs/RELEASE.md](docs/RELEASE.md).
 
 ### After a release (deploy)

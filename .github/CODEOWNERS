@@ -38,4 +38,4 @@ package-lock.json                   @mkowalew-chromatic
 scripts/                            @mkowalew-chromatic
 deploy/                             @mkowalew-chromatic
 .github/                            @mkowalew-chromatic
-apps/smoke-tests/                   @mkowalew-chromatic
+apps/playwright-e2e/                @mkowalew-chromatic

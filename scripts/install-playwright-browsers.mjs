@@ -4,7 +4,7 @@
  *
  * Three suites drive a real browser — `npm run test:stories` and
  * `npm run test:visual` (the design system's stories and visual tests, via
- * @vitest/browser-playwright) and `npm run smoke:test` (apps/smoke-tests) —
+ * @vitest/browser-playwright) and `npm run smoke:test` (apps/playwright-e2e) —
  * and all use chromium. npm does not fetch browser
  * binaries with the packages, so without this they fail on a fresh clone with
  * `browserType.launch: Executable doesn't exist`.

@@ -457,7 +457,7 @@ For the **API**, rollback first takes a fresh backup of the current database, so
 
 For the **EHR and Portal**, rollback is a symlink swap and an nginx reload. It is instant and involves no rebuild.
 
-The Deploy workflow runs the same rollback automatically when the smoke tests fail after a deploy.
+The Deploy workflow runs the same rollback automatically when the end-to-end tests fail after a deploy.
 
 ---
 

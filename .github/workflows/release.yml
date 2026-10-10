@@ -123,7 +123,7 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.release.outputs.deploy-matrix) }}
     steps:
-      # Each unit gets its own "Deploy" run (staging → smoke test → production),
+      # Each unit gets its own "Deploy" run (staging → end-to-end gate → production),
       # visible in the Actions tab as "Deploy <unit> @ <tag>".
       - name: Dispatch deploy.yml for ${{ matrix.unit }}
         run: >

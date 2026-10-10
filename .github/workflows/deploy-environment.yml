@@ -1,8 +1,14 @@
 name: Deploy to environment
 
 # Reusable: build one release unit for one environment, deploy it over SSH,
-# smoke-test it, and roll back on failure. Called by deploy.yml — not meant to
-# be run directly.
+# run the Playwright end-to-end tests (apps/playwright-e2e) against it, and roll
+# back on failure. Called by deploy.yml — not meant to be run directly.
+#
+# On staging the whole suite runs and is the gate to production: this job
+# failing is what stops deploy.yml from promoting the release. Its browser
+# snapshots are uploaded to Chromatic for visual review. On production only
+# the @smoke tests run — they are read-only, and production is already past
+# the gate.
 
 on:
   workflow_call:
@@ -19,6 +25,10 @@ on:
         description: Tag or commit to build and deploy
         type: string
         required: true
+      suite:
+        description: 'End-to-end tests to run after deploying: full (the staging gate) or smoke'
+        type: string
+        required: true
 
 jobs:
   deploy:
@@ -28,8 +38,10 @@ jobs:
     # that LAN (deploy/setup-runner.sh). This workflow is only ever started
     # by workflow_dispatch — never by pull_request — so forks cannot reach it.
     runs-on: [self-hosted, careconnect-lan]
-    # Protection rules on the environment (required reviewers, wait timer,
-    # branch/tag restrictions) gate this job — that is the production approval.
+    # Protection rules on the environment (branch/tag restrictions, and any
+    # reviewers or wait timer) still apply. The production approval itself is
+    # the staging end-to-end gate in deploy.yml, so production needs no
+    # required reviewers (docs/RELEASE.md § Environments).
     environment:
       name: ${{ inputs.environment }}
       url: ${{ inputs.unit == 'portal' && vars.PORTAL_URL || vars.EHR_URL }}
@@ -107,34 +119,98 @@ jobs:
         id: deploy
         run: bash deploy/remote-deploy.sh --config "$DEPLOY_CONFIG_FILE" "${{ steps.package.outputs.artifact }}"
 
+      # A gate that can't run must not pass: without the URLs, staging fails
+      # here instead of promoting an untested release. Production keeps
+      # skipping its smoke run when they are unset.
+      - name: Check end-to-end test configuration
+        if: inputs.suite == 'full' && (vars.EHR_URL == '' || vars.PORTAL_URL == '')
+        run: |
+          echo "::error::Environment '${{ inputs.environment }}' needs the EHR_URL and PORTAL_URL variables for the end-to-end gate — see docs/RELEASE.md § One-time setup."
+          exit 1
+
       - name: Install Playwright browsers
         if: vars.EHR_URL != '' && vars.PORTAL_URL != ''
         run: npx playwright install --with-deps chromium
 
-      - name: Smoke test
-        id: smoke
+      # DEPLOY_UNIT / DEPLOY_VERSION let the suite check that the build it
+      # just shipped is the one serving (the checkout is the deployed ref).
+      - name: End-to-end tests (${{ inputs.suite }})
+        id: e2e
         if: vars.EHR_URL != '' && vars.PORTAL_URL != ''
+        working-directory: apps/playwright-e2e
         env:
           EHR_URL: ${{ vars.EHR_URL }}
           PORTAL_URL: ${{ vars.PORTAL_URL }}
-        run: npm run smoke:test
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+          DEPLOY_UNIT: ${{ inputs.unit }}
+          CHROMATIC_SNAPSHOTS: ${{ inputs.suite == 'full' && 'on' || 'off' }}
+        run: |
+          export DEPLOY_VERSION="$(node -p "require('../${DEPLOY_UNIT}/package.json').version")"
+          if [ "${{ inputs.suite }}" = "full" ]; then npm test; else npm run test:smoke; fi
 
-      - name: Upload smoke test report
-        if: always() && steps.smoke.outcome != 'skipped'
+      - name: Upload end-to-end test report
+        if: always() && steps.e2e.outcome != 'skipped'
         uses: actions/upload-artifact@v7
         with:
-          name: smoke-report-${{ inputs.unit }}-${{ inputs.environment }}
-          path: apps/smoke-tests/playwright-report
+          name: e2e-report-${{ inputs.unit }}-${{ inputs.environment }}
+          path: |
+            apps/playwright-e2e/playwright-report
+            apps/playwright-e2e/test-results
           if-no-files-found: ignore
 
-      # Only roll back what this run deployed: a smoke failure after a
+      # Visual review of the staging run, in its own Chromatic project. Runs
+      # whether the tests passed or failed: a failed test's snapshot shows what
+      # the page looked like. Visual changes do not block production — a
+      # release's UI changes were reviewed on its PRs — so builds auto-accept
+      # and each deploy is compared with the previous one. continue-on-error:
+      # a Chromatic outage must not hold or roll back a release.
+      #
+      # The CLI rather than chromaui/action: this run is a workflow_dispatch
+      # from main that checks out a tag, and the action would report the build
+      # against main's head (GITHUB_SHA). CHROMATIC_SHA/BRANCH pin it to the
+      # commit actually deployed, on a "staging" branch in Chromatic.
+      - name: Publish end-to-end snapshots to Chromatic
+        if: always() && inputs.suite == 'full' && steps.e2e.outcome != 'skipped'
+        continue-on-error: true
+        working-directory: apps/playwright-e2e
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PLAYWRIGHT_PROJECT_TOKEN }}
+          CHROMATIC_BRANCH: ${{ inputs.environment }}
+        run: |
+          if [ -z "$CHROMATIC_PROJECT_TOKEN" ]; then
+            echo "::notice::CHROMATIC_PLAYWRIGHT_PROJECT_TOKEN is not set — skipping the Chromatic upload."
+            exit 0
+          fi
+          export CHROMATIC_SHA="$(git rev-parse HEAD)"
+          npm run chromatic -- --exit-zero-on-changes --auto-accept-changes
+
+      # Only roll back what this run deployed: a test failure after a
       # successful deploy. A failed deploy already left the VM on the previous
       # release (api) or never switched the symlink (frontends).
       - name: Roll back ${{ inputs.unit }} on ${{ inputs.environment }}
         if: failure() && steps.deploy.outcome == 'success'
         run: |
-          echo "::error::Smoke tests failed after deploying ${{ inputs.unit }} — rolling back."
+          echo "::error::End-to-end tests failed after deploying ${{ inputs.unit }} — rolling back."
           bash deploy/remote-rollback.sh --config "$DEPLOY_CONFIG_FILE" "${{ inputs.unit }}"
+
+      - name: Explain the stopped release
+        if: failure() && inputs.suite == 'full'
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          {
+            echo "## ${{ inputs.unit }} @ \`${REF}\` was not promoted to production"
+            echo
+            echo "The staging run failed (build, deploy or the end-to-end gate), so production was not touched."
+            if [ "${{ steps.deploy.outcome }}" = "success" ]; then
+              echo "Staging has been rolled back to the previous ${{ inputs.unit }} release."
+            fi
+            echo
+            echo "**Action required:**"
+            echo "1. Open the \`e2e-report-${{ inputs.unit }}-${{ inputs.environment }}\` artifact below (Playwright report, traces, screenshots); the Chromatic build for this commit shows each test's last page."
+            echo "2. Fix the regression and release again, or — if the failure was environmental — re-run this workflow."
+            echo "3. Shipping without a green gate needs **Deploy** with \`environments = production\`, which waits for approval on the \`production-override\` environment."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remove config and key
         if: always()

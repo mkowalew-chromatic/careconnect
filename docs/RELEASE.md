@@ -21,7 +21,7 @@ The list is defined in [`scripts/release-units.mjs`](../scripts/release-units.mj
 
 **The design system is consumed at HEAD.** The apps keep a workspace link (`"@careconnect/design-system": "*"`) and always build against the current component library. A breaking component change therefore fails the EHR or Portal build on the design-system pull request itself, and the design-system team fixes the consumers, or coordinates with them, before merging. A design-system bump also patch-bumps `ehr` and `portal`, which are then redeployed with the new components. This is deliberate: it gives each team independent releases without giving up atomic cross-cutting changes. The alternative, publishing the library to a registry and letting the apps pin versions, is discussed under [Alternatives considered](#alternatives-considered).
 
-`@careconnect/smoke-tests` is a test harness, not a release unit, and Changesets ignores it.
+`@careconnect/playwright-e2e` is a test harness, not a release unit, and Changesets ignores it.
 
 ---
 
@@ -103,8 +103,13 @@ Only packages with changes receive a new version, tag, release, and deploy. A po
 
 [`deploy.yml`](../.github/workflows/deploy.yml) runs once per unit and ref (for example, `Deploy portal @ @careconnect/portal@1.3.0`), so the Actions history doubles as a per-team deploy log. It calls [`deploy-environment.yml`](../.github/workflows/deploy-environment.yml) for each environment in turn:
 
-1. **Staging.** Check out the tag, build that unit's artifact with the staging config (`deploy/package-artifact.sh --unit <unit>`), upload it as `careconnect-<unit>-staging`, ship it with `deploy/remote-deploy.sh`, and run the Playwright smoke tests against staging. A smoke failure rolls that unit back on staging.
-2. **Production.** Gated by the `production` GitHub Environment's protection rules (required reviewers, wait timer). The same steps run with the production config, with the same rollback on smoke failure.
+1. **Staging.** Check out the tag, build that unit's artifact with the staging config (`deploy/package-artifact.sh --unit <unit>`), upload it as `careconnect-<unit>-staging`, ship it with `deploy/remote-deploy.sh`, and run the full Playwright end-to-end suite ([`apps/playwright-e2e`](../apps/playwright-e2e/README.md)) against staging. The suite's browser snapshots go to Chromatic for visual review.
+2. **The gate.** If the suite passes, production deploys automatically; nobody needs to approve it. If any test fails (after one retry), that unit is rolled back on staging, production is never touched, and the run ends red with a summary of what to do next. Someone has to act: fix the regression and release again, re-run the workflow if the failure was environmental, or approve a production-only deploy (below).
+3. **Production.** The same steps with the production config, followed by only the read-only `@smoke` tests, with the same rollback on failure.
+
+Visual changes in Chromatic do not block the gate: a release's UI changes were already reviewed on its pull requests, and a visual diff is not a failure. Each staging build is auto-accepted on a `staging` branch in the end-to-end Chromatic project, so the next deploy is compared with this one and every deploy's visual changes stay reviewable there. A Chromatic outage never holds a release.
+
+A production-only deploy (`environments = production`) skips the gate, so it waits for a reviewer on the `production-override` environment instead.
 
 Deploys of the same unit are serialized; different units deploy in parallel.
 
@@ -150,25 +155,31 @@ The script registers the runner and installs it as a systemd service. The deploy
 
 ### Environments: `staging` and `production`
 
-Create both under **Settings → Environments**. On `production`, add required reviewers (this is the production approval gate) and restrict deployments to tags or `main` as you see fit. Each environment carries its own values:
+Create both under **Settings → Environments**. The staging end-to-end suite is the production approval, so `production` needs **no** required reviewers (remove any it has, or every release waits for a click); restrict deployments to tags or `main` as you see fit. Each environment carries its own values:
 
 | Kind | Name | Value |
 |---|---|---|
 | Secret | `DEPLOY_CONFIG` | The full contents of that environment's `careconnect.env` (based on [`deploy/careconnect.env.example`](../deploy/careconnect.env.example)): `DEPLOY_MODE`, `DOMAIN`, ports, and the SSH target `VM_USER`, `VM_HOST`, `VM_PORT` |
 | Secret | `DEPLOY_SSH_KEY` | The private key for `VM_USER@VM_HOST`. That user needs passwordless `sudo` for `deploy-artifact.sh` and `rollback.sh` |
 | Variable | `DEPLOY_KNOWN_HOSTS` | Optional but recommended: the VM's `known_hosts` line. Without it, the host key is trusted on first use |
-| Variable | `EHR_URL`, `PORTAL_URL` | The public URLs the smoke tests hit. If unset, the smoke step is skipped |
+| Variable | `EHR_URL`, `PORTAL_URL` | The public URLs the end-to-end tests hit. Required on `staging`: without them the gate fails rather than letting an untested release through. On `production`, unset means the smoke run is skipped |
+| Secret | `E2E_PASSWORD` | Optional: the seeded demo password, if the environment does not use the default |
+
+Also create a third environment, **`production-override`**, with required reviewers and no secrets or variables. It holds nothing; its only job is to make a production-only deploy, which skips the staging gate, wait for a person. Create it before the first such deploy: GitHub creates a missing environment on first use with no protection rules, so the approval would be skipped.
 
 The VM itself is prepared once with the installer (see [deploy/DEPLOYMENT.md](../deploy/DEPLOYMENT.md)). After that, only artifacts are shipped to it.
 
 ### Chromatic
 
-Chromatic keeps Storybook builds and Vitest builds in separate projects, so the repository needs two, both linked to this repository:
+Chromatic keeps each test framework's builds in a project of its own, so the repository has one project per framework, each linked to this repository and each with its own token named after the framework:
 
 | Name | Kind | Notes |
 | --- | --- | --- |
 | `CHROMATIC_PROJECT_TOKEN` | repository secret | Token of the Storybook project. |
 | `CHROMATIC_VITEST_PROJECT_TOKEN` | repository secret | Token of the Vitest project. When adding it in Chromatic, choose this repository a second time and give the project a distinct name. |
+| `CHROMATIC_PLAYWRIGHT_PROJECT_TOKEN` | repository secret | Token of the Playwright project that the staging deploys upload to ([`apps/playwright-e2e`](../apps/playwright-e2e/README.md)). Choose this repository a third time, with another distinct name. |
+
+A future suite in another framework gets its own project and token on the same pattern, for example `CHROMATIC_CYPRESS_PROJECT_TOKEN`. Mixing frameworks in one project would compare unrelated snapshots against each other's baselines.
 
 Each job skips until its secret is set. UI Review for a project only works once that project has a build on `main`: on the PR that first adds a project, its UI Review check stays pending, and the build after the merge sets the baseline. See [packages/design-system/CONTRIBUTING.md](../packages/design-system/CONTRIBUTING.md).
 
@@ -204,7 +215,7 @@ gh workflow run deploy.yml -f unit=portal -f ref=@careconnect/portal@1.3.0
 1. Branch from `main`.
 2. Fix the issue in the affected unit and add a **patch** changeset for that unit.
 3. Merge. The train releases and deploys only that unit.
-4. If the deploy must skip staging, run **Deploy** by hand with `environments = production`. The production approval still applies.
+4. If the deploy must skip staging, run **Deploy** by hand with `environments = production`. It waits for a reviewer on the `production-override` environment, because the end-to-end gate does not run.
 
 To roll a unit back on a VM without redeploying, run `sudo deploy/rollback.sh <unit>` on the VM, or `deploy/remote-rollback.sh --config deploy/<environment>.env <unit>` from a laptop. To roll forward to a known-good version, run **Deploy** with that tag.
 
@@ -229,15 +240,16 @@ Scope by unit where it helps: `fix(portal): …`, `feat(api): …`.
 
 | File | Purpose |
 |------|---------|
-| [`.changeset/config.json`](../.changeset/config.json) | Independent versioning; private packages are versioned and tagged; dependents are always patch-bumped; smoke-tests are ignored |
+| [`.changeset/config.json`](../.changeset/config.json) | Independent versioning; private packages are versioned and tagged; dependents are always patch-bumped; playwright-e2e are ignored |
 | [`scripts/release-units.mjs`](../scripts/release-units.mjs) | The four release units with their teams and kinds; used by the release tooling |
 | [`scripts/github-releases.mjs`](../scripts/github-releases.mjs) | Creates a GitHub Release for each tagged release unit from its CHANGELOG section; idempotent |
 | [`scripts/release-publish.sh`](../scripts/release-publish.sh) | Manual fallback: tag, push tags, and create releases |
 | [`.github/CODEOWNERS`](../.github/CODEOWNERS) | Review ownership per unit and shared package |
 | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | One typecheck, test, and build job per unit, `--affected` on PRs, plus the aggregate required check |
 | [`.github/workflows/release.yml`](../.github/workflows/release.yml) | Version Packages PR, then tags, GitHub Releases, and deploy dispatch |
-| [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) | One unit, staging then production; also used for manual redeploys |
-| [`.github/workflows/deploy-environment.yml`](../.github/workflows/deploy-environment.yml) | Reusable workflow: build, ship, smoke-test, and roll back on failure for one environment |
+| [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) | One unit, staging then production, promoted automatically when the staging end-to-end gate passes; also used for manual redeploys |
+| [`.github/workflows/deploy-environment.yml`](../.github/workflows/deploy-environment.yml) | Reusable workflow: build, ship, run the end-to-end tests (and upload them to Chromatic on staging), and roll back on failure for one environment |
+| [`apps/playwright-e2e`](../apps/playwright-e2e/README.md) | The Playwright end-to-end suite: the staging gate, and the `@smoke` subset run on production |
 | [`.github/workflows/chromatic.yml`](../.github/workflows/chromatic.yml) | Visual review on every PR, for the Storybook and the Vitest visual tests (separate Chromatic projects); auto-accepted baselines on `main` |
 | [`deploy/package-artifact.sh`](../deploy/package-artifact.sh) | Builds and packages one unit as `careconnect-<unit>-<version>-<sha>.tar.gz` |
 | [`deploy/deploy-artifact.sh`](../deploy/deploy-artifact.sh) · [`rollback.sh`](../deploy/rollback.sh) | On-VM deploy and rollback of one unit |

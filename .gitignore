@@ -12,6 +12,8 @@ MANIFEST.json
 coverage/
 test-results/
 playwright-report/
+# Playwright signed-in sessions (apps/playwright-e2e/tests/auth.setup.ts)
+.auth/
 # Vitest browser mode: Chromatic's DOM archives, failure screenshots
 .vitest/
 .vitest-attachments/

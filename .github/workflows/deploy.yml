@@ -7,17 +7,22 @@ name: Deploy
 # commit — e.g. to re-ship a known-good API after a rollback. Each run is one
 # unit, so the Actions history reads as a per-team deploy log.
 #
-# Flow: build the unit's artifact with the target environment's config →
-# ship it with deploy/remote-deploy.sh → run the Playwright smoke tests →
-# (production only) wait for the environment's required reviewers, then
-# repeat. A failed smoke test rolls that unit back on that environment.
+# Flow: build the unit's artifact with the staging config → ship it with
+# deploy/remote-deploy.sh → run the full Playwright end-to-end suite against
+# staging. That suite is the production gate: when it passes, production
+# deploys automatically (same steps, @smoke tests only); when it fails, staging
+# is rolled back, production is never touched, and the run stays red until
+# someone acts on it — fix and release again, re-run, or approve an override.
 #
 # Per-environment configuration lives in GitHub Environments "staging" and
 # "production" (see docs/RELEASE.md § One-time setup):
 #   secrets  DEPLOY_CONFIG   contents of the environment's careconnect.env
 #            DEPLOY_SSH_KEY  private key for VM_USER@VM_HOST from that config
 #   vars     DEPLOY_KNOWN_HOSTS  (optional) known_hosts entry for VM_HOST
-#            EHR_URL, PORTAL_URL  public URLs for the smoke tests
+#            EHR_URL, PORTAL_URL  public URLs for the end-to-end tests
+#                                 (required on staging: no URLs, no gate)
+# plus a "production-override" environment with required reviewers and no
+# secrets, which only gates production deploys that skip staging.
 
 run-name: Deploy ${{ inputs.unit }} @ ${{ inputs.ref }} (${{ inputs.environments }})
 
@@ -55,18 +60,34 @@ jobs:
       environment: staging
       unit: ${{ inputs.unit }}
       ref: ${{ inputs.ref }}
+      suite: full
     secrets: inherit
 
+  # A production-only deploy has no staging gate, so a person has to stand in
+  # for it: this job waits for the production-override environment's required
+  # reviewers. It never runs when staging does.
+  override:
+    name: Approve production without the staging gate
+    if: inputs.environments == 'production'
+    runs-on: ubuntu-latest
+    environment: production-override
+    steps:
+      - run: echo "Production deploy of ${{ inputs.unit }} approved without a staging end-to-end run."
+
   production:
-    needs: staging
-    # Run when staging passed, or was intentionally skipped (environments=production).
+    needs: [staging, override]
+    # Promote automatically when the staging gate passed; a production-only
+    # deploy instead needs the override approval. A failed or cancelled
+    # staging run never reaches production.
     if: >-
       always() &&
       inputs.environments != 'staging' &&
-      (needs.staging.result == 'success' || needs.staging.result == 'skipped')
+      (needs.staging.result == 'success' ||
+       (needs.staging.result == 'skipped' && needs.override.result == 'success'))
     uses: ./.github/workflows/deploy-environment.yml
     with:
       environment: production
       unit: ${{ inputs.unit }}
       ref: ${{ inputs.ref }}
+      suite: smoke
     secrets: inherit

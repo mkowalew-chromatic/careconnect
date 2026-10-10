@@ -12,7 +12,7 @@
     "tag": true
   },
   "ignore": [
-    "@careconnect/smoke-tests"
+    "@careconnect/playwright-e2e"
   ],
   "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
     "updateInternalDependents": "always"

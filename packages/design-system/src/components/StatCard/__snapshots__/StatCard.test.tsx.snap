@@ -112,7 +112,7 @@ exports[`renders StatCard with sparkline 1`] = `
                       >
                         <defs>
                           <clippath
-                            id=":r1:"
+                            id="_r_1_"
                           >
                             <rect
                               height="177"
@@ -124,7 +124,7 @@ exports[`renders StatCard with sparkline 1`] = `
                         </defs>
                         <g
                           class="recharts-layer"
-                          clip-path="url(#:r1:)"
+                          clip-path="url(#_r_1_)"
                         >
                           <path
                             class="recharts-curve recharts-area-area"
@@ -132,7 +132,7 @@ exports[`renders StatCard with sparkline 1`] = `
                             fill="#0D7377"
                             fill-opacity="0.12"
                             height="170"
-                            id="recharts-area-:r0:"
+                            id="recharts-area-_r_0_"
                             stroke="none"
                             stroke-width="2"
                             width="310"

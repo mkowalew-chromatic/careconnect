@@ -47,7 +47,7 @@ import { DESIGN_SYSTEM_VERSION } from '@careconnect/design-system';
 
 ### Requirements
 
-- **React 18** (`react` and `react-dom` are peer dependencies — the package does not bundle its own copy).
+- **React 19** (`react` and `react-dom` are peer dependencies — the package does not bundle its own copy).
 - **An ESM-aware bundler or Node 20+.** The package ships ES modules only; there is no CommonJS entry, so `require()` will not resolve it.
 
 ### Exports

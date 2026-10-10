@@ -15,7 +15,7 @@ bumps, every workspace that depends on it gets a patch bump too
 (`updateInternalDependents: always`) — its built output changed, so its
 version must change. Don't add changesets for dependents by hand.
 
-`@careconnect/smoke-tests` is a test harness, not a release unit, and is
+`@careconnect/playwright-e2e` is a test harness, not a release unit, and is
 ignored by Changesets.
 
 Every workspace is private, so `changeset publish` creates git tags

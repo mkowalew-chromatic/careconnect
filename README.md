@@ -197,7 +197,8 @@ npm run typecheck     # tsc --noEmit in every TypeScript workspace
 npm test              # unit tests for the API and design system (smoke tests excluded)
 npm run test:stories  # every design-system story as a browser test
 npm run test:visual   # design-system *.visual.test.tsx flows in a browser, captured for Chromatic
-npm run smoke:test    # Playwright smoke tests against a running stack (apps/smoke-tests)
+npm run e2e:test      # Playwright end-to-end suite against a running stack (apps/playwright-e2e)
+npm run smoke:test    # just its @smoke subset
 ```
 
 All three Playwright-backed suites drive a real chromium. `npm install` fetches it
@@ -231,7 +232,7 @@ careconnect/
 │   ├── api/              # Express REST API + SQLite
 │   ├── ehr/              # Staff EHR (React + Vite; includes role-gated billing)
 │   ├── portal/           # Patient portal (React + Vite)
-│   └── smoke-tests/      # Playwright smoke tests against a running stack
+│   └── playwright-e2e/   # Playwright end-to-end tests against a running stack
 ├── packages/
 │   ├── design-system/    # UI component library + Storybook
 │   ├── types/            # Shared types + questionnaire schemas
@@ -295,7 +296,7 @@ There are three ways to deploy CareConnect:
 | **Remote over SSH** | Deploying from a laptop to an Ubuntu VM | [DEPLOYMENT.md § Remote](deploy/DEPLOYMENT.md#remote-deployment-ssh) |
 | **On the VM** | Already logged in to the Ubuntu host | [DEPLOYMENT.md § On-VM](deploy/DEPLOYMENT.md#on-vm-installation) |
 
-Each deployable unit (`api`, `ehr`, `portal`) ships on its own. The **Deploy** workflow builds one unit's artifact, deploys it to staging, runs the smoke tests, and promotes it to production. The release flow dispatches it automatically for every unit that received a new version, and you can also dispatch it by hand for any tag. Because units deploy independently, a portal release never restarts the API.
+Each deployable unit (`api`, `ehr`, `portal`) ships on its own. The **Deploy** workflow builds one unit's artifact, deploys it to staging, runs the Playwright end-to-end suite there, and promotes it to production automatically when every test passes. A failure rolls staging back and stops the release before production. The release flow dispatches it automatically for every unit that received a new version, and you can also dispatch it by hand for any tag. Because units deploy independently, a portal release never restarts the API.
 
 From your laptop:
 
@@ -326,7 +327,7 @@ The shared packages (`types`, `api-client`, `mock-data`) are versioned independe
 
 **Contributing a change.** After making a user-facing change, run `npm run changeset`, select only the workspaces you touched, and commit the generated file with your pull request. Review ownership for each unit is defined in [.github/CODEOWNERS](.github/CODEOWNERS).
 
-**Pipeline.** `ci.yml` runs one job per unit on every pull request; only the units the PR touches do real work. The design-system job also runs every story and every `*.visual.test.tsx` flow as a browser test. `chromatic.yml` runs on every pull request too, with two jobs: one publishes the Storybook, the other uploads the Vitest visual tests to a second Chromatic project. The workflow deliberately has no `paths:` filter, so its checks can safely be required in branch protection: a workflow held back by a path filter never starts, and a required check that never starts blocks the pull request forever. TurboSnap keeps that cheap by snapshotting only the stories and tests a commit actually affects. Both workflows also listen on `merge_group`, so their checks still report if you turn on GitHub's merge queue. On merge to `main`, `release.yml` opens or refreshes a **Version Packages** pull request. When that PR merges, the workflow tags each bumped package, creates a GitHub Release for each release unit, and dispatches `deploy.yml` for each deployable unit (staging, then smoke tests, then production, subject to the production environment's approval rules). Details, the one-time GitHub setup, and manual fallbacks are in [docs/RELEASE.md](docs/RELEASE.md).
+**Pipeline.** `ci.yml` runs one job per unit on every pull request; only the units the PR touches do real work. The design-system job also runs every story and every `*.visual.test.tsx` flow as a browser test. `chromatic.yml` runs on every pull request too, with two jobs: one publishes the Storybook, the other uploads the Vitest visual tests to a second Chromatic project. The workflow deliberately has no `paths:` filter, so its checks can safely be required in branch protection: a workflow held back by a path filter never starts, and a required check that never starts blocks the pull request forever. TurboSnap keeps that cheap by snapshotting only the stories and tests a commit actually affects. Both workflows also listen on `merge_group`, so their checks still report if you turn on GitHub's merge queue. On merge to `main`, `release.yml` opens or refreshes a **Version Packages** pull request. When that PR merges, the workflow tags each bumped package, creates a GitHub Release for each release unit, and dispatches `deploy.yml` for each deployable unit (staging, then the end-to-end gate, then production). Details, the one-time GitHub setup, and manual fallbacks are in [docs/RELEASE.md](docs/RELEASE.md).
 
 AI coding agents working in this repository should follow [AGENTS.md](AGENTS.md).
 
